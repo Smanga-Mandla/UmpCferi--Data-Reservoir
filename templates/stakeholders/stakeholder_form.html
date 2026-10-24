@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-9"><div class="card"><div class="card-body p-4">
+  <h1 class="h3">{{ title }}</h1>
+  <p class="text-body-secondary">Stakeholder contacts are separate from login accounts. Reuse an existing person record when a duplicate warning appears.</p>
+  {% if form.duplicate_matches %}
+    <div class="alert alert-warning" role="alert"><h2 class="h6">Possible duplicate stakeholder</h2>
+      <ul class="mb-0">{% for contact, reason in form.duplicate_matches %}<li>{{ contact.name }} ({{ reason }} match) — <a href="{% url 'stakeholders:detail' contact.pk %}">view existing record</a></li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+  <form method="post">{% csrf_token %}
+    {% for field in form %}
+      {% if field.name != "relationship_types" %}
+        <div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+      {% endif %}
+    {% endfor %}
+    <fieldset class="mb-4"><legend class="h6">Stakeholder relationship types</legend>
+      {% for checkbox in form.relationship_types %}<div class="form-check">{{ checkbox.tag }}<label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label></div>{% endfor %}
+      {% for error in form.relationship_types.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+    </fieldset>
+    {% if details_form %}
+      <div class="border-top pt-3 mb-3"><h2 class="h5">Restricted board and employment details</h2><p class="small text-body-secondary">Visible and editable only to authorised administration roles.</p></div>
+      {% for field in details_form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.name == "assigned_incubatees" %}<div class="form-text">Only incubatees you are authorized to update are available. Ending an assignment keeps its history.</div>{% endif %}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+    {% endif %}
+    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+    <button class="btn btn-primary">Save stakeholder</button>
+    {% if stakeholder %}<a class="btn btn-outline-secondary" href="{% url 'stakeholders:detail' stakeholder.pk %}">Cancel</a>{% else %}<a class="btn btn-outline-secondary" href="{% url 'stakeholders:list' %}">Cancel</a>{% endif %}
+  </form>
+</div></div></div></div></section>
+{% endblock %}

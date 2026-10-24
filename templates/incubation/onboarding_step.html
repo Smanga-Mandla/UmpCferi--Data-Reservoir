@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · Onboarding | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <p><a href="{% url 'incubation:detail' incubatee.pk %}">{{ incubatee }}</a> / Onboarding</p>
+  <h1 class="h2">Step {{ step }} of 8: {{ title }}</h1>
+  <div class="progress mb-3" role="progressbar" aria-label="Onboarding progress" aria-valuenow="{{ step|add:'0' }}" aria-valuemin="1" aria-valuemax="8"><div class="progress-bar" style="width: {% widthratio step 8 100 %}%"></div></div>
+  <nav class="nav nav-pills flex-wrap gap-1 mb-4" aria-label="Onboarding steps">{% for number,label in steps %}<span class="nav-link {% if step == number %}active{% else %}disabled{% endif %}">{{ number }}. {{ label }}</span>{% endfor %}</nav>
+  <div class="card"><div class="card-body p-4">
+    {% if step == 3 %}
+      <p class="text-body-secondary">Founder identity and demographic details are restricted to authorised administrators. ID numbers are encrypted at rest. Existing founders are matched by encrypted ID fingerprint when one is provided.</p>
+      <form method="post">{% csrf_token %}{{ formset.management_form }}
+        <div id="founder-forms">{% for founder_form in formset %}<fieldset class="founder-entry border rounded p-3 mb-3"><legend class="float-none w-auto px-2 h6">Founder {{ forloop.counter }}</legend>
+          {% for hidden in founder_form.hidden_fields %}{{ hidden }}{% endfor %}
+          {% for field in founder_form.visible_fields %}{% if field.name != "DELETE" %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endif %}{% endfor %}
+          {% if founder_form.instance.pk %}<div class="form-check">{{ founder_form.DELETE }}<label class="form-check-label" for="{{ founder_form.DELETE.id_for_label }}">Remove founder from this business</label></div>{% endif %}
+        </fieldset>{% endfor %}</div>
+        <template id="empty-founder-form"><fieldset class="founder-entry border rounded p-3 mb-3"><legend class="float-none w-auto px-2 h6">Additional founder</legend>{% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}{% for field in formset.empty_form.visible_fields %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}</fieldset></template>
+        <button class="btn btn-outline-secondary mb-3" type="button" id="add-founder">Add another founder</button>
+        {% for error in formset.non_form_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+        <div class="d-flex justify-content-between"><a class="btn btn-outline-secondary" href="{% url 'incubation:onboarding_step' incubatee.pk 2 %}">Previous step</a><button class="btn btn-primary">Save and continue</button></div>
+      </form>
+    {% elif step == 8 %}
+      <p class="text-body-secondary">Consent decisions are recorded separately by purpose. Do not infer consent from a blank response.</p>
+      <form method="post">{% csrf_token %}<h2 class="h5">POPIA consent</h2>
+        {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% if field.name == "popia_method" %}<hr><h2 class="h5">Funder reporting data-sharing consent</h2>{% endif %}{% endfor %}
+        <div class="d-flex justify-content-between"><a class="btn btn-outline-secondary" href="{% url 'incubation:onboarding_step' incubatee.pk 7 %}">Previous step</a><button class="btn btn-primary">Save consent and finish</button></div>
+      </form>
+    {% else %}
+      {% if step == 1 %}<p class="text-body-secondary">Company information. Duplicate CIPC registration numbers are rejected.</p>{% endif %}
+      {% if step == 2 %}<p class="text-body-secondary">SIC code list/version and detailed sub-sector taxonomy require CFERI confirmation.</p>{% endif %}
+      {% if step == 6 %}<p class="text-body-secondary">Enter customer types rather than customer names unless a separately approved policy permits personal data.</p>{% endif %}
+      <form method="post">{% csrf_token %}{% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+        {% if duplicate_incubatee %}<div class="alert alert-warning">This registration number belongs to <a href="{% url 'incubation:detail' duplicate_incubatee.pk %}">{{ duplicate_incubatee }}</a>.</div>{% endif %}
+        <div class="d-flex justify-content-between"><span>{% if has_previous %}<a class="btn btn-outline-secondary" href="{% url 'incubation:onboarding_step' incubatee.pk step|add:'-1' %}">Previous step</a>{% endif %}</span><button class="btn btn-primary">Save and continue</button></div>
+      </form>
+    {% endif %}
+  </div></div>
+</section>
+{% if step == 3 %}<script>
+(() => {
+  const addButton = document.getElementById("add-founder");
+  const forms = document.getElementById("founder-forms");
+  const total = document.getElementById("id_founders-TOTAL_FORMS");
+  const template = document.getElementById("empty-founder-form");
+  addButton.addEventListener("click", () => {
+    const index = Number(total.value);
+    forms.insertAdjacentHTML("beforeend", template.innerHTML.replaceAll("__prefix__", index));
+    total.value = index + 1;
+  });
+})();
+</script>{% endif %}
+{% endblock %}

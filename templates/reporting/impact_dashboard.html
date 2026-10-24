@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Impact report | UMP CFERI{% endblock %}
+{% block content %}
+<div class="container-fluid py-4"><div class="row g-0">
+  {% include "includes/sidebar.html" %}
+  <section class="col-md-9 col-lg-10 px-md-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+      <div><h1 class="h2">Impact dashboard</h1><p class="text-body-secondary">Period-scoped recorded observations; missing values are excluded, not treated as zero.</p></div>
+      <div class="d-flex gap-2"><a class="btn btn-outline-success" href="{% url 'reporting:impact_export' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:impact_export' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>
+    </div>
+    <form method="get" class="card card-body mb-3"><div class="row g-2 align-items-end"><div class="col-sm-4"><label class="form-label" for="date_from">Period start</label><input class="form-control" type="date" name="date_from" id="date_from" value="{{ date_from|date:'Y-m-d' }}"></div><div class="col-sm-4"><label class="form-label" for="date_to">Period end</label><input class="form-control" type="date" name="date_to" id="date_to" value="{{ date_to|date:'Y-m-d' }}"></div><div class="col-auto"><button class="btn btn-primary">Apply period</button> <a class="btn btn-outline-secondary" href="{% url 'reporting:impact' %}">Clear</a></div></div></form>
+    <p class="small text-body-secondary">Reporting period: {{ date_from|default:"All available history" }} to {{ date_to|default:"Latest available" }}. Businesses represented: {% if business_count is not None %}{{ business_count }}{% else %}Suppressed{% endif %}.</p>
+    <div class="row g-3 mb-4">
+      <div class="col-sm-4"><div class="card card-body h-100"><div class="text-body-secondary">Jobs created</div><div class="display-6">{% if jobs_created is not None %}{{ jobs_created }}{% elif jobs_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</div><small>Recorded jobs created; jobs lost shown separately in source check-ins.</small></div></div>
+      <div class="col-sm-4"><div class="card card-body h-100"><div class="text-body-secondary">Funding received</div><div class="display-6">{% if funding_raised_zar is not None %}R {{ funding_raised_zar|floatformat:2 }}{% elif funding_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</div><small>Recorded ZAR receipts in the selected period.</small></div></div>
+      <div class="col-sm-4"><div class="card card-body h-100"><div class="text-body-secondary">Mean revenue growth since baseline</div><div class="display-6">{% if revenue_growth_percent is not None %}{{ revenue_growth_percent|floatformat:2 }}%{% elif revenue_growth_status == "missing" %}No comparable data{% else %}Suppressed{% endif %}</div><small>{% if revenue_growth_businesses is not None %}{{ revenue_growth_businesses }}{% else %}Suppressed{% endif %} businesses with a comparable baseline and period value.</small></div></div>
+    </div>
+    <div class="card mb-4"><div class="card-body"><h2 class="h5">Historical monthly trend</h2><canvas id="impactChart" aria-label="Jobs created and funding received by month" role="img"></canvas><div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Period</th><th>Jobs created</th><th>Funding received (ZAR)</th></tr></thead><tbody>{% for row in monthly_trend %}<tr><td>{{ row.label }}</td><td>{% if row.jobs_created is not None %}{{ row.jobs_created }}{% elif row.jobs_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</td><td>{% if row.funding_raised_zar is not None %}R {{ row.funding_raised_zar|floatformat:2 }}{% elif row.funding_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No monthly observations in the selected period.</td></tr>{% endfor %}</tbody></table></div></div></div>
+    <div class="row g-3">
+      {% for dimension,buckets in breakdowns.items %}
+        <div class="col-xl-6"><div class="card h-100"><div class="card-body"><h2 class="h5">By {{ dimension|title }}</h2>
+          {% if dimension == "gender" or dimension == "youth" %}<p class="small text-body-secondary">Founder demographic aggregate; cells smaller than {{ privacy_minimum }} are suppressed.</p>{% endif %}
+          <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Category</th>{% if dimension == "gender" or dimension == "youth" %}<th>Founders</th>{% else %}<th>Businesses</th><th>Jobs</th><th>Funding (ZAR)</th><th>Revenue growth</th>{% endif %}</tr></thead><tbody>{% for item in buckets %}<tr><td>{{ item.label }}</td>{% if dimension == "gender" or dimension == "youth" %}<td>{% if item.count is not None %}{{ item.count }}{% else %}Suppressed{% endif %}</td>{% else %}<td>{% if item.businesses is not None %}{{ item.businesses }}{% else %}Suppressed{% endif %}</td><td>{% if item.jobs_created is not None %}{{ item.jobs_created }}{% elif item.jobs_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</td><td>{% if item.funding_raised_zar is not None %}R {{ item.funding_raised_zar|floatformat:2 }}{% elif item.funding_status == "missing" %}No recorded value{% else %}Suppressed{% endif %}</td>          <td>{% if item.revenue_growth_percent is not None %}{{ item.revenue_growth_percent|floatformat:2 }}%{% elif item.revenue_growth_status == "missing" %}No comparable data{% else %}Suppressed{% endif %}</td>{% endif %}</tr>{% empty %}<tr><td colspan="5" class="text-body-secondary">No data available in permitted scope.</td></tr>{% endfor %}</tbody></table></div>
+        </div></div></div>
+      {% endfor %}
+    </div>
+    <p class="small text-body-secondary mt-3">Metric formulas and the founder youth age threshold remain provisional; see the Open Decisions register.</p>
+  </section>
+</div></div>
+{{ chart_categories|json_script:"impact-categories" }}
+{{ chart_jobs|json_script:"impact-jobs" }}
+{{ chart_funding|json_script:"impact-funding" }}
+<script>
+  new Chart(document.getElementById("impactChart"), {
+    type: "bar",
+    data: {
+      labels: JSON.parse(document.getElementById("impact-categories").textContent),
+      datasets: [
+        {label: "Jobs created", data: JSON.parse(document.getElementById("impact-jobs").textContent), yAxisID: "jobs", backgroundColor: "#ff7c28"},
+        {label: "Funding received (ZAR)", data: JSON.parse(document.getElementById("impact-funding").textContent), yAxisID: "funding", backgroundColor: "#003064"}
+      ]
+    },
+    options: {responsive: true, scales: {jobs: {beginAtZero: true, position: "left"}, funding: {beginAtZero: true, position: "right", grid: {drawOnChartArea: false}}}}
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Audit log | UMP CFERI{% endblock %}
+{% block content %}
+<div class="container-fluid py-4"><div class="row g-0">
+  {% include "includes/sidebar.html" %}
+  <section class="col-md-9 col-lg-10 px-md-4">
+    <h1 class="h2">Audit log</h1>
+    <p class="text-body-secondary">Read-only audit events, newest first. Results are limited to the latest 500 events.</p>
+    {% if can_export %}<div class="d-flex gap-2 mb-3"><a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'audit' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'audit' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>{% endif %}
+    <form method="get" class="card card-body mb-3"><div class="row g-2 align-items-end">
+      <div class="col-sm-4"><label for="action" class="form-label">Action</label><select id="action" name="action" class="form-select"><option value="">All actions</option>{% for value,label in actions %}<option value="{{ value }}" {% if value == selected_action %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="col-sm-4"><label for="resource" class="form-label">Resource</label><input id="resource" name="resource" class="form-control" maxlength="64" value="{{ resource }}"></div>
+      <div class="col-auto"><button class="btn btn-primary">Filter</button></div>
+    </div></form>
+    <div class="card"><div class="table-responsive"><table class="table table-striped table-hover mb-0">
+      <thead><tr><th>Timestamp</th><th>Actor</th><th>Action</th><th>Resource</th><th>Record</th><th>Outcome</th><th>Metadata</th><th>Request</th></tr></thead>
+      <tbody>{% for event in events %}<tr>
+        <td>{{ event.occurred_at|date:"Y-m-d H:i:s T" }}</td><td>{{ event.actor|default:"System" }}</td><td>{{ event.get_action_display }}</td>
+        <td>{{ event.resource }}</td><td>{{ event.object_id|default:"—" }}</td><td>{{ event.outcome }}</td>
+        <td><code class="small">{{ event.metadata }}</code></td><td><span class="small">{{ event.ip_address|default:"—" }}</span></td>
+      </tr>{% empty %}<tr><td colspan="8" class="text-body-secondary text-center py-4">No audit events match these filters.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  </section>
+</div></div>
+{% endblock %}

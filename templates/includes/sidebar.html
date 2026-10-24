@@ -1,0 +1,30 @@
+<aside class="col-md-3 col-lg-2 dashboard-sidebar">
+  <nav class="list-group list-group-flush" aria-label="Dashboard navigation">
+    <a class="list-group-item list-group-item-action" href="{% url 'reporting:dashboard' %}">My dashboards</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'documents:list' %}">Centre documents</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'documents:compliance' %}">Compliance status</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'documents:alerts' %}">Expiry alerts</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'partners:partner_list' %}">Partners</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_list' %}">MOUs</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_expiry_alerts' %}">MOU renewal alerts</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'stakeholders:list' %}">Stakeholders</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'incubation:list' %}">Incubatees</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'incubation:checkin_list' %}">Monthly check-ins</a>
+    <a class="list-group-item list-group-item-action" href="{% url 'interactions:list' %}">Interactions</a>
+    {% if can_view_reports %}
+      <a class="list-group-item list-group-item-action" href="{% url 'reporting:impact' %}">Impact report</a>
+    {% endif %}
+    {% if can_view_audit_log %}
+      <a class="list-group-item list-group-item-action" href="{% url 'reporting:audit_log' %}">Audit log</a>
+    {% endif %}
+    {% for role in dashboard_roles %}
+      <a class="list-group-item list-group-item-action" href="{% url 'reporting:'|add:role.code %}">{{ role.get_code_display }}</a>
+    {% endfor %}
+    {% if can_manage_users %}
+      <a class="list-group-item list-group-item-action" href="{% url 'accounts:manage_users' %}">Manage accounts</a>
+    {% endif %}
+    {% if can_manage_role_matrix %}
+      <a class="list-group-item list-group-item-action" href="{% url 'accounts:role_matrix' %}">Role permissions</a>
+    {% endif %}
+  </nav>
+</aside>

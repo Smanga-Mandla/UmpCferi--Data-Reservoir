@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ stakeholder.name }} | Stakeholders{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <p><a href="{% url 'stakeholders:list' %}">Stakeholder Directory</a></p>
+  <div class="d-flex justify-content-between align-items-start gap-2">
+    <div><h1 class="h2">{{ stakeholder.name }}</h1><p class="text-body-secondary">{{ stakeholder.title|default:"Stakeholder" }}</p></div>
+    <div class="d-flex gap-2">{% if can_update %}<a class="btn btn-outline-primary" href="{% url 'stakeholders:update' stakeholder.pk %}">Edit stakeholder</a>{% endif %}{% if can_delete %}<form method="post" action="{% url 'stakeholders:delete' stakeholder.pk %}">{% csrf_token %}<button class="btn btn-outline-danger">Delete</button></form>{% endif %}</div>
+  </div>
+  {% if linked %}<div class="alert alert-info mt-3">This person is linked to a partner or MOU and cannot be deleted until those relationships are unlinked.</div>{% endif %}
+  <div class="card mb-3"><div class="card-body">
+    <h2 class="h5">Person record</h2>
+    <dl class="row mb-0"><dt class="col-sm-3">Relationship types</dt><dd class="col-sm-9">{% for assignment in relationship_history %}{% if assignment.is_active %}<span class="badge text-bg-secondary me-1">{{ assignment.get_relationship_type_display }}</span>{% endif %}{% empty %}No type assigned{% endfor %}</dd>
+      <dt class="col-sm-3">Title / position</dt><dd class="col-sm-9">{{ stakeholder.title|default:"—" }}</dd>
+      {% if can_view_contact_details %}<dt class="col-sm-3">Email</dt><dd class="col-sm-9"><a href="mailto:{{ stakeholder.email }}">{{ stakeholder.email }}</a></dd><dt class="col-sm-3">Phone</dt><dd class="col-sm-9">{{ stakeholder.phone|default:"—" }}</dd>{% else %}<dt class="col-sm-3">Contact details</dt><dd class="col-sm-9 text-body-secondary">Restricted to authorised roles.</dd>{% endif %}
+    </dl>
+  </div></div>
+
+  {% if can_view_profiles %}
+    {% if board_profile %}
+      <div class="card mb-3"><div class="card-body"><h2 class="h5">Board Member information</h2>
+        <dl class="row mb-0"><dt class="col-sm-3">Appointment date</dt><dd class="col-sm-9">{{ board_profile.appointment_date|default:"—" }}</dd><dt class="col-sm-3">Term end</dt><dd class="col-sm-9">{{ board_profile.term_end|default:"—" }}</dd><dt class="col-sm-3">Committees</dt><dd class="col-sm-9">{{ board_profile.committees|default:"—"|linebreaksbr }}</dd><dt class="col-sm-3">Declarations of interest</dt><dd class="col-sm-9">{{ board_profile.declarations_of_interest|default:"—"|linebreaksbr }}</dd></dl>
+      </div></div>
+    {% endif %}
+    {% if staff_profile %}
+      <div class="card mb-3"><div class="card-body"><h2 class="h5">Staff / Freelancer information</h2>
+        <dl class="row mb-0"><dt class="col-sm-3">Position</dt><dd class="col-sm-9">{{ staff_profile.position|default:"—" }}</dd><dt class="col-sm-3">Contract dates</dt><dd class="col-sm-9">{{ staff_profile.contract_start|default:"—" }} – {{ staff_profile.contract_end|default:"—" }}</dd><dt class="col-sm-3">Skills</dt><dd class="col-sm-9">{{ staff_profile.skills|default:"—"|linebreaksbr }}</dd></dl>
+        <h3 class="h6 mt-3">Assigned incubatees</h3>
+        <ul class="mb-0">{% for incubatee in assigned_incubatees %}<li><a href="{% url 'incubation:detail' incubatee.pk %}">{{ incubatee }}</a></li>{% empty %}<li class="text-body-secondary">No assigned incubatees.</li>{% endfor %}</ul>
+      </div></div>
+    {% endif %}
+    <div class="card mb-3"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">POPIA consent history</h2>{% if can_add_consent %}<a class="btn btn-sm btn-outline-primary" href="{% url 'stakeholders:consent_add' stakeholder.pk %}">Record consent</a>{% endif %}</div>
+      <div class="table-responsive mt-3"><table class="table table-sm mb-0"><thead><tr><th>Date</th><th>Purpose</th><th>Method</th><th>Recorded by</th></tr></thead><tbody>
+        {% for consent in consent_history %}<tr><td>{{ consent.consent_date }}</td><td>{{ consent.purpose|linebreaksbr }}</td><td>{{ consent.method }}</td><td>{{ consent.recorded_by.email }}</td></tr>{% empty %}<tr><td colspan="4" class="text-body-secondary">No consent history recorded.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div></div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Partner representative links</h2>
+      {% for link in partner_links %}<p class="mb-1"><a href="{% url 'partners:partner_detail' link.partner_id %}">{{ link.partner.name }}</a> <span class="small text-body-secondary">linked {{ link.linked_at|date:"Y-m-d" }}</span></p>{% empty %}<p class="text-body-secondary mb-0">No accessible partner links.</p>{% endfor %}
+    </div></div></div>
+    <div class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">MOU representative links</h2>
+      {% for mou in mous %}<p class="mb-1"><a href="{% url 'partners:mou_detail' mou.pk %}">{{ mou.title }}</a> <span class="small text-body-secondary">· {{ mou.partner.name }}</span></p>{% empty %}<p class="text-body-secondary mb-0">No accessible MOU links.</p>{% endfor %}
+    </div></div></div>
+  </div>
+  {% if can_view_profiles %}
+    <div class="card mt-3"><div class="card-body"><h2 class="h5">Relationship assignment history</h2>
+      <ul class="mb-0">{% for assignment in relationship_history %}<li>{{ assignment.get_relationship_type_display }} — {% if assignment.is_active %}active{% else %}ended {{ assignment.ended_at|date:"Y-m-d" }}{% endif %}</li>{% empty %}<li>No relationships assigned.</li>{% endfor %}</ul>
+    </div></div>
+  {% endif %}
+</section>
+{% endblock %}

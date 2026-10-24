@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="row justify-content-center"><div class="col-lg-8 col-xl-7">
+    <div class="card shadow-sm"><div class="card-body p-4">
+      <h1 class="h3">{{ title }}</h1>
+      <p class="text-body-secondary">Maximum file size: 25 MB. Accepted formats: PDF, DOCX, XLSX, JPEG, PNG, GIF, WebP and TIFF.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+        <button class="btn btn-primary" type="submit">{% if document %}Upload new version{% else %}Upload document{% endif %}</button>
+        {% if document %}<a class="btn btn-outline-secondary" href="{% url 'documents:detail' document.pk %}">Cancel</a>{% else %}<a class="btn btn-outline-secondary" href="{% url 'documents:list' %}">Cancel</a>{% endif %}
+      </form>
+    </div></div>
+  </div></div>
+</section>
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ interaction.get_interaction_type_display }} | Interactions{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <p><a href="{% url 'interactions:list' %}">Interactions</a></p>
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div><h1 class="h2">{{ interaction.get_interaction_type_display }}</h1><p class="text-body-secondary">{{ interaction.occurred_at|date:"l, Y-m-d H:i" }}{% if interaction.duration_minutes is not None %} · {{ interaction.duration_minutes }} minutes{% endif %} · {{ interaction.get_sensitivity_display }}</p></div>
+    <div class="d-flex gap-2">
+      {% if can_update %}<a class="btn btn-outline-primary" href="{% url 'interactions:update' interaction.pk %}">Edit</a>{% endif %}
+      {% if can_delete %}<form method="post" action="{% url 'interactions:delete' interaction.pk %}">{% csrf_token %}<button class="btn btn-outline-danger">Archive</button></form>{% endif %}
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card mb-3"><div class="card-body">
+        <h2 class="h5">Interaction details</h2>
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Participants</dt><dd class="col-sm-9">{% if board_only %}Participant details are restricted pending CFERI policy confirmation.{% else %}{% for item in participants %}{{ item.name }}{% if item.can_view_contact and item.stakeholder.email %} <span class="text-body-secondary">({{ item.stakeholder.email }})</span>{% endif %}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}{% endif %}</dd>
+          <dt class="col-sm-3">Incubatees</dt><dd class="col-sm-9">{% for incubatee in incubatees %}<a href="{% url 'incubation:detail' incubatee.pk %}">{{ incubatee }}</a>{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+          <dt class="col-sm-3">Partners</dt><dd class="col-sm-9">{% for partner in partners %}{{ partner.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+          {% if not board_only %}<dt class="col-sm-3">Topics</dt><dd class="col-sm-9">{{ interaction.topics|default:"—"|linebreaksbr }}</dd>
+          <dt class="col-sm-3">Outcome</dt><dd class="col-sm-9">{{ interaction.outcome|default:"—"|linebreaksbr }}</dd>
+          <dt class="col-sm-3">Recorded by</dt><dd class="col-sm-9">{{ interaction.created_by.email }}</dd>{% endif %}
+        </dl>
+      </div></div>
+      <div class="card mb-3"><div class="card-body">
+        <h2 class="h5">Follow-up actions</h2>
+        {% if board_only %}<p class="text-body-secondary">Follow-up details are restricted pending CFERI policy confirmation.</p>{% endif %}
+        {% for task in tasks %}
+          {% if can_update %}
+          <form method="post" action="{% url 'interactions:task_update' interaction.pk task.pk %}" class="border rounded p-3 mb-2">
+            {% csrf_token %}
+            <div class="row g-2">
+              <div class="col-md-5"><label class="form-label" for="task-description-{{ task.pk }}">Action</label><input id="task-description-{{ task.pk }}" class="form-control" name="description" value="{{ task.description }}" maxlength="500" required></div>
+              <div class="col-md-3"><label class="form-label" for="task-owner-{{ task.pk }}">Owner</label><select id="task-owner-{{ task.pk }}" class="form-select" name="owner" required>{% for candidate in task_owner_choices %}<option value="{{ candidate.pk }}" {% if candidate.pk == task.owner_id %}selected{% endif %}>{{ candidate.email }}</option>{% endfor %}</select></div>
+              <div class="col-md-2"><label class="form-label" for="task-due-{{ task.pk }}">Due</label><input id="task-due-{{ task.pk }}" class="form-control" type="date" name="due_date" value="{{ task.due_date|date:'Y-m-d' }}" required></div>
+              <div class="col-md-2"><label class="form-label" for="task-status-{{ task.pk }}">Status</label><select id="task-status-{{ task.pk }}" class="form-select" name="status">{% for value,label in task_status_choices %}<option value="{{ value }}" {% if value == task.status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+            </div>
+            <button class="btn btn-sm btn-outline-primary mt-2">Update task</button>
+          </form>
+          {% else %}
+            <div class="border rounded p-3 mb-2"><strong>{{ task.description }}</strong><div>{{ task.owner.email }} · Due {{ task.due_date }} · {{ task.get_status_display }}</div></div>
+          {% endif %}
+        {% empty %}<p class="text-body-secondary">No follow-up tasks recorded.</p>{% endfor %}
+        {% if can_update %}
+          <h3 class="h6 mt-3">Add follow-up task</h3>
+          <form method="post" action="{% url 'interactions:task_add' interaction.pk %}">
+            {% csrf_token %}
+            <div class="row g-2">
+              {% for field in task_form %}
+                <div class="col-md-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+              {% endfor %}
+            </div>
+            <button class="btn btn-sm btn-primary mt-2">Create task</button>
+          </form>
+        {% endif %}
+      </div></div>
+      {% if show_attendance %}
+        <div class="card mb-3"><div class="card-body">
+          <h2 class="h5">Attendance register</h2>
+          <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Participant</th><th>Status</th><th></th></tr></thead><tbody>
+            {% for entry in attendance %}
+              <tr><td>{{ entry.display_name }}</td><td colspan="2">
+                {% if can_update %}
+                <form method="post" action="{% url 'interactions:attendance_update' interaction.pk entry.pk %}" class="d-flex gap-2">
+                  {% csrf_token %}<input type="hidden" name="stakeholder" value="{{ entry.stakeholder_id|default:'' }}"><input type="hidden" name="participant_name" value="{% if not entry.stakeholder_id %}{{ entry.participant_name }}{% endif %}">
+                  <select class="form-select form-select-sm" name="status">{% for value,label in attendance_status_choices %}<option value="{{ value }}" {% if value == entry.status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                  <button class="btn btn-sm btn-outline-primary">Save</button>
+                </form>
+                {% else %}{{ entry.get_status_display }}{% endif %}
+              </td></tr>
+            {% empty %}<tr><td colspan="3" class="text-body-secondary">No attendance recorded.</td></tr>{% endfor %}
+          </tbody></table></div>
+          {% if can_update %}<form method="post" action="{% url 'interactions:attendance_add' interaction.pk %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            {% for field in attendance_form %}<div class="col-md-4"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+            <div class="col-md-2"><button class="btn btn-sm btn-primary">Add attendee</button></div>
+          </form>{% endif %}
+        </div></div>
+      {% endif %}
+    </div>
+    <div class="col-lg-4">
+      <div class="card"><div class="card-body"><h2 class="h5">Change history</h2>
+        <ul class="list-group list-group-flush">{% for entry in history %}<li class="list-group-item px-0"><strong>{{ entry.get_change_type_display }}</strong><div class="small text-body-secondary">{{ entry.created_at }} · {{ entry.changed_by.email }}</div></li>{% empty %}<li class="list-group-item px-0">No history available.</li>{% endfor %}</ul>
+      </div></div>
+    </div>
+  </div>
+</section>
+{% endblock %}

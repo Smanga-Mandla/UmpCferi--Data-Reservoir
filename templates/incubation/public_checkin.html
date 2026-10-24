@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Monthly business check-in | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="row justify-content-center"><div class="col-lg-8">
+    <div class="card"><div class="card-body p-4">
+      <h1 class="h3">Monthly business check-in</h1>
+      <p class="text-body-secondary">Reporting period: {{ period_start|date:"F Y" }}. This form is designed to take about five minutes. Leave unknown items blank; enter zero when the value is zero, or mark an item not applicable.</p>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for field in form %}
+          {% if field.is_hidden %}
+            {{ field }}
+          {% elif field.field.widget.input_type == "checkbox" %}
+            <div class="form-check mb-2">{{ field }}<label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+          {% else %}
+            <div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>
+          {% endif %}
+        {% endfor %}
+        <button class="btn btn-primary">Submit check-in</button>
+      </form>
+    </div></div>
+  </div></div>
+</section>
+{% endblock %}

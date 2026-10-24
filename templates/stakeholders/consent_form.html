@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Record POPIA consent | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-7"><div class="card"><div class="card-body p-4">
+  <h1 class="h3">Record POPIA consent</h1><p class="text-body-secondary">For {{ stakeholder.name }}. Saved entries are retained as consent history and cannot be edited or deleted.</p>
+  <form method="post">{% csrf_token %}{% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+    {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+    <button class="btn btn-primary">Save consent record</button> <a class="btn btn-outline-secondary" href="{% url 'stakeholders:detail' stakeholder.pk %}">Cancel</a>
+  </form>
+</div></div></div></div></section>
+{% endblock %}

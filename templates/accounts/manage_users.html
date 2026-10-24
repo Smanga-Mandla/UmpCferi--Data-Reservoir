@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Manage accounts | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div><h1 class="h2 mb-1">Manage accounts</h1><p class="text-body-secondary mb-0">Invite users, assign roles and expiry dates, or deactivate access.</p></div>
+    <a class="btn btn-primary" href="{% url 'accounts:invite_user' %}">Invite user</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead><tr><th>Email</th><th>Name</th><th>Roles</th><th>Access expiry</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for managed_user in managed_users %}
+          <tr>
+            <td>{{ managed_user.email }}</td>
+            <td>{{ managed_user.get_full_name|default:"—" }}</td>
+            <td>{% for role in managed_user.roles.all %}<span class="badge text-bg-secondary me-1">{{ role.get_code_display }}</span>{% empty %}—{% endfor %}</td>
+            <td>{{ managed_user.access_expires_at|default:"—" }}</td>
+            <td>{% if managed_user.is_active %}Active{% else %}Inactive{% endif %}</td>
+            <td>
+              {% if managed_user.pk != user.pk %}
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'accounts:edit_user_access' managed_user.pk %}">Edit access</a>
+                {% if managed_user.is_active %}
+                  <form class="d-inline" method="post" action="{% url 'accounts:deactivate_user' managed_user.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Deactivate</button>
+                  </form>
+                {% endif %}
+              {% else %}<span class="text-body-secondary">Current account</span>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="text-center py-4">No user accounts yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

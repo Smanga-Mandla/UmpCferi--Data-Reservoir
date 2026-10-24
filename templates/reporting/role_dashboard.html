@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}{{ role.get_code_display }} Dashboard | UMP CFERI{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-0">
+    {% include "includes/sidebar.html" %}
+    <section class="col-md-9 col-lg-10 px-md-4">
+      <p class="text-primary fw-semibold text-uppercase small mb-2">Role dashboard</p>
+      <div class="d-flex justify-content-between align-items-start">
+        <div><h1 class="h2">{{ role.get_code_display }}</h1><p class="text-body-secondary">Operational and reporting information available to your role.</p></div>
+        {% if can_view_impact %}<a class="btn btn-outline-primary" href="{% url 'reporting:impact' %}">Impact report</a>{% endif %}
+        {% if can_export_dashboard %}<a class="btn btn-outline-success" href="{% url 'reporting:dashboard_export' role.code 'xlsx' %}">Export Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:dashboard_export' role.code 'pdf' %}">Export PDF</a>{% endif %}
+      </div>
+      {% if system_health_only %}
+        <div class="alert alert-info">Your role has system-health reporting access only. Business dashboards and incubatee information are not available through this account.</div>
+      {% else %}
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Incubatees in permitted scope</div><div class="display-6">{% if incubatee_total is not None %}{{ incubatee_total }}{% else %}Suppressed{% endif %}</div><div class="small">Businesses</div></div></div></div>
+          <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Active MOUs</div><div class="display-6">{{ active_mou_count }}</div><div class="small">Authorized agreements</div></div></div></div>
+          <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Documents expiring / expired in 60 days</div><div class="display-6">{{ expiring_documents|length }}</div><div class="small">Accessible documents</div></div></div></div>
+          <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Overdue monthly check-ins</div><div class="display-6">{% if overdue_checkin_count is not None %}{{ overdue_checkin_count }}{% else %}Suppressed{% endif %}</div><div class="small">Permitted reporting scope</div></div></div></div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Incubatees by status</h2><canvas id="statusChart" aria-label="Incubatees by lifecycle status" role="img"></canvas><ul class="list-group list-group-flush mt-3">{% for item in incubatee_status_counts %}<li class="list-group-item d-flex justify-content-between"><span>{{ item.label }}</span><strong>{% if item.count is not None %}{{ item.count }}{% else %}Suppressed{% endif %}</strong></li>{% endfor %}</ul></div></div></div>
+          <div class="col-lg-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Expiring documents</h2><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Document</th><th>Expiry</th><th>Status</th></tr></thead><tbody>{% for document in expiring_documents %}<tr><td><a href="{% url 'documents:detail' document.pk %}">{{ document.title }}</a></td><td>{{ document.expiry_date }}</td><td>{% if document.expiry_date < today %}Expired{% else %}Expiring{% endif %}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No accessible documents expire within 60 days.</td></tr>{% endfor %}</tbody></table></div></div></div></div>
+        </div>
+
+        {% if overdue_checkins %}
+          <div class="card mb-4"><div class="card-body"><h2 class="h5">Overdue check-ins</h2><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Incubatee</th><th>Period</th><th>Due</th><th>Status</th></tr></thead><tbody>{% for checkin in overdue_checkins %}<tr><td><a href="{% url 'incubation:detail' checkin.incubatee_id %}">{{ checkin.incubatee }}</a></td><td>{{ checkin.period_start|date:"F Y" }}</td><td>{{ checkin.due_date }}</td><td>Overdue</td></tr>{% endfor %}</tbody></table></div></div></div>
+        {% endif %}
+
+        {% if quality_rows %}
+          <div class="card mb-4"><div class="card-body"><h2 class="h5">Data quality</h2><p class="text-body-secondary small">Profile completeness is the share of five tracked report fields populated. It is a technical indicator, not an official mandatory-field policy.</p><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Incubatee</th><th>Profile completeness</th><th>Missing tracked fields</th><th>Duplicate warning</th><th>Overdue</th><th>Latest check-in completeness</th></tr></thead><tbody>{% for row in quality_rows %}<tr><td><a href="{% url 'incubation:detail' row.incubatee.pk %}">{{ row.incubatee }}</a></td><td>{{ row.profile_completeness }}%</td><td>{{ row.missing|join:", "|default:"None flagged" }}</td><td>{% if row.possible_duplicate %}<span class="text-danger">Review possible duplicate</span>{% else %}—{% endif %}</td><td>{{ row.overdue|yesno:"Yes,No" }}</td><td>{% if row.completeness is not None %}{{ row.completeness }}%{% else %}No submitted check-in{% endif %}</td></tr>{% endfor %}</tbody></table></div></div></div>
+        {% endif %}
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% if not system_health_only %}
+{{ chart_status_labels|json_script:"status-labels" }}
+{{ chart_status_values|json_script:"status-values" }}
+<script>
+  const statusLabels = JSON.parse(document.getElementById("status-labels").textContent);
+  const statusValues = JSON.parse(document.getElementById("status-values").textContent);
+  new Chart(document.getElementById("statusChart"), {
+    type: "bar",
+    data: {labels: statusLabels, datasets: [{label: "Businesses", data: statusValues, backgroundColor: "#ff7c28"}]},
+    options: {responsive: true, scales: {y: {beginAtZero: true, ticks: {precision: 0}}}}
+  });
+</script>
+{% endif %}
+{% endblock %}

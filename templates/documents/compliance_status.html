@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Compliance status | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container-fluid py-4">
+  <h1 class="h2">Compliance status</h1>
+  {% if can_export %}<div class="d-flex gap-2 mb-3"><a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'compliance' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'compliance' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>{% endif %}
+  <p class="text-body-secondary">Status reflects documents your account is permitted to view.</p>
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3"><div class="card border-success"><div class="card-body"><div class="text-body-secondary">Valid</div><div class="display-6">{{ status_counts.valid }}</div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card border-warning"><div class="card-body"><div class="text-body-secondary">Expires within 60 days</div><div class="display-6">{{ status_counts.expiring }}</div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card border-danger"><div class="card-body"><div class="text-body-secondary">Expired</div><div class="display-6">{{ status_counts.expired }}</div></div></div></div>
+    <div class="col-6 col-xl-3"><div class="card border-secondary"><div class="card-body"><div class="text-body-secondary">No expiry date</div><div class="display-6">{{ status_counts.no_expiry }}</div></div></div></div>
+  </div>
+  {% if not missing_categories_configured %}
+    <div class="alert alert-info">Missing-document rules are not configured because the SRS does not identify which categories are required. See open decision OD-06.</div>
+  {% endif %}
+  <div class="table-responsive"><table class="table table-hover bg-white">
+    <thead><tr><th>Document</th><th>Category</th><th>Expiry date</th><th>Status</th></tr></thead>
+    <tbody>{% for document in documents %}
+      <tr><td><a href="{% url 'documents:detail' document.pk %}">{{ document.title }}</a></td><td>{{ document.get_category_display }}</td><td>{{ document.expiry_date|default:"—" }}</td><td>
+        {% if document.expiry_status == "expired" %}<span class="badge text-bg-danger">Expired</span>
+        {% elif document.expiry_status == "expiring" %}<span class="badge text-bg-warning">Expires within 60 days</span>
+        {% elif document.expiry_status == "no_expiry" %}<span class="badge text-bg-secondary">No expiry date</span>
+        {% else %}<span class="badge text-bg-success">Valid</span>{% endif %}
+      </td></tr>
+    {% empty %}<tr><td colspan="4">No documents are available to your account.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

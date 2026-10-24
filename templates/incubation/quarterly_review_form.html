@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Quarterly review | {{ incubatee }}{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-8"><div class="card"><div class="card-body p-4">
+  <h1 class="h3">Quarterly review</h1><p class="text-body-secondary">{{ incubatee }} · Scores are recorded as dated observations; prior quarters remain unchanged.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+    <button class="btn btn-primary">Record quarterly review</button> <a class="btn btn-outline-secondary" href="{% url 'incubation:detail' incubatee.pk %}">Cancel</a>
+  </form>
+  <p class="small text-body-secondary mt-3">Choose the first day of the calendar quarter. Status values are recorded as entered; confirm any controlled vocabulary with CFERI.</p>
+</div></div></div></div></section>
+{% endblock %}

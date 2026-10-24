@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Monthly check-ins | Incubatees{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3"><h1 class="h2">Monthly check-ins</h1><div class="d-flex gap-2">{% if can_export %}<a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'checkins' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'checkins' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>{% endif %}<a class="btn btn-outline-secondary" href="{% url 'incubation:list' %}">Incubatees</a></div></div>
+  <div class="table-responsive"><table class="table table-striped align-middle"><thead><tr><th>Incubatee</th><th>Period</th><th>Submitted</th><th>Completeness</th><th>Due</th><th>State</th></tr></thead><tbody>
+    {% for row in checkins %}{% with checkin=row.checkin %}
+      <tr><td><a href="{% url 'incubation:detail' checkin.incubatee_id %}">{{ checkin.incubatee }}</a></td><td>{{ checkin.period_start|date:"F Y" }}</td><td>{{ checkin.submitted_at|date:"Y-m-d H:i"|default:"Not submitted" }}</td><td>{% if checkin.completeness_score is not None %}{{ row.completeness.score }}% ({{ row.completeness.missing }} missing, {{ row.completeness.not_applicable }} N/A){% else %}—{% endif %}</td><td>{{ checkin.due_date|default:"Not configured" }}</td><td>{% if checkin.submitted_at %}<span class="badge text-bg-success">Complete</span>{% elif checkin.due_date and checkin.due_date < today %}<span class="badge text-bg-danger">Overdue</span>{% else %}<span class="badge text-bg-warning">Pending</span>{% endif %}</td></tr>
+    {% endwith %}
+    {% empty %}<tr><td colspan="6" class="text-center py-4">No check-ins have been scheduled yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

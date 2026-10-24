@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Verify authenticator | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h3">Verify your identity</h1>
+          <p>Enter the current code from your authenticator app to continue.</p>
+          {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}
+          <form method="post">
+            {% csrf_token %}
+            <label class="form-label" for="otp-token">Authenticator code</label>
+            <input id="otp-token" name="otp_token" class="form-control mb-3" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required autofocus>
+            <button class="btn btn-primary w-100" type="submit">Verify</button>
+          </form>
+          <form method="post" action="{% url 'accounts:logout' %}" class="mt-3">
+            {% csrf_token %}
+            <button class="btn btn-link px-0" type="submit">Sign out</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Document expiry alerts | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <h1 class="h2">Document expiry alerts</h1>
+  <p class="text-body-secondary">Alerts are listed only for documents available to your account.</p>
+  {% if can_export %}<div class="d-flex gap-2 mb-3"><a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'document_alerts' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'document_alerts' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>{% endif %}
+  <div class="table-responsive"><table class="table table-hover bg-white">
+    <thead><tr><th>Document</th><th>Expires</th><th>Scheduled reminder</th><th>Email status</th></tr></thead>
+    <tbody>{% for alert in alerts %}
+      <tr>
+        <td><a href="{% url 'documents:detail' alert.document.pk %}">{{ alert.document.title }}</a></td>
+        <td>{{ alert.expiry_date }}</td>
+        <td>{{ alert.days_before }}-day reminder (due {{ alert.due_date }})</td>
+        <td>{% if alert.email_sent_at %}<span class="badge text-bg-success">Sent {{ alert.email_sent_at }}</span>{% elif alert.email_error %}<span class="badge text-bg-warning">Not sent</span><span class="small d-block">{{ alert.email_error }}</span>{% else %}<span class="badge text-bg-secondary">Pending</span>{% endif %}</td>
+      </tr>
+    {% empty %}<tr><td colspan="4">No expiry alerts are available.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

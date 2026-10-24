@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Sign in | University of Mpumalanga CFERI{% endblock %}
+{% block content %}
+<section class="container login-page-shell">
+  <div class="login-card mx-auto">
+    <header class="login-heading">
+      <span class="login-heading-accent" aria-hidden="true"></span>
+      <h1>University of Mpumalanga CFERI</h1>
+      <p>Data Reservoir</p>
+    </header>
+
+    <div class="login-content">
+       
+
+      <div class="login-form-panel">
+    
+ 
+        {% if form.errors %}
+          <div class="alert alert-danger" role="alert">Please check your email, password, and authenticator code.</div>
+        {% endif %}
+        <form method="post" id="sign_in_form">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="row g-3">
+            {% for field in form %}
+              {% if field.name != "otp_token" %}
+                <div class="col-md-6">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.otp_token.id_for_label }}">{{ form.otp_token.label }}</label>
+            {{ form.otp_token }}
+            {% for error in form.otp_token.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2" role="alert">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <button class="btn btn-primary login-submit w-100" type="submit">Sign in</button>
+        </form>
+        <div class="login-links">
+          <a href="{% url 'accounts:password_reset' %}">Reset password</a>
+        
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

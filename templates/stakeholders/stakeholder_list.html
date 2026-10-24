@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Stakeholder directory | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="d-flex justify-content-between align-items-center gap-2">
+    <div><h1 class="h2">Stakeholder Directory</h1><p class="text-body-secondary">Reusable person records with multiple relationship types.</p></div>
+    <div class="d-flex gap-2">
+      {% if can_export %}<a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'stakeholders' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'stakeholders' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>{% endif %}
+      {% if can_create %}<a class="btn btn-primary" href="{% url 'stakeholders:create' %}">Add stakeholder</a>{% endif %}
+    </div>
+  </div>
+  <form method="get" class="card card-body my-3">
+    <div class="row g-2"><div class="col"><label class="visually-hidden" for="contact-search">Search stakeholders</label><input id="contact-search" class="form-control" type="search" name="q" value="{{ query }}" placeholder="Name, title{% if can_search_contact_fields %}, email or phone{% endif %}"></div><div class="col-auto"><button class="btn btn-outline-primary">Search</button></div></div>
+  </form>
+  <div class="table-responsive"><table class="table table-hover bg-white align-middle">
+    <thead><tr><th>Name and relationships</th><th>Position / title</th><th>Contact details</th></tr></thead>
+    <tbody>
+      {% for contact in stakeholders %}
+        <tr>
+          <td><a href="{% url 'stakeholders:detail' contact.pk %}" class="fw-semibold">{{ contact.name }}</a>
+            <div class="small text-body-secondary">{{ contact.active_relationship_types|join:", "|default:"No relationship type assigned" }}</div>
+          </td>
+          <td>{{ contact.title|default:"—" }}</td>
+          <td>{% if contact.show_contact_details %}<div>{{ contact.email }}</div><div class="small">{{ contact.phone|default:"—" }}</div>{% else %}<span class="text-body-secondary">Restricted</span>{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="3">No stakeholder records are available to your account.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

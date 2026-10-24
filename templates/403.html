@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Access denied | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-5">
+  <div class="alert alert-danger" role="alert">
+    <h1 class="h4">Access denied</h1>
+    <p class="mb-0">Your account does not have permission to perform that action.</p>
+  </div>
+  <a class="btn btn-outline-primary" href="{% url 'documents:list' %}">Return to centre documents</a>
+</section>
+{% endblock %}

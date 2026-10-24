@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ partner.name }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div><p><a href="{% url 'partners:partner_list' %}">Partners</a></p><h1 class="h2">{{ partner.name }}</h1><p class="text-body-secondary">{{ partner.get_organisation_type_display }}{% if partner.sector %} · {{ partner.sector }}{% endif %}</p></div>
+    {% if can_update %}<div class="d-flex gap-2"><a class="btn btn-outline-primary" href="{% url 'partners:partner_update' partner.pk %}">Edit partner</a><form method="post" action="{% url 'partners:partner_delete' partner.pk %}">{% csrf_token %}<button class="btn btn-outline-danger">Delete</button></form></div>{% endif %}
+  </div>
+  <div class="row g-3 mt-1">
+    {% if partner.current_image %}
+    <div class="col-12"><div class="card"><div class="card-body d-flex flex-wrap align-items-center gap-3">
+      <img src="{% url 'partners:partner_image' partner.pk partner.current_image.pk %}" alt="{{ partner.name }} logo or image" class="img-thumbnail" style="max-width: 12rem; max-height: 8rem; object-fit: contain">
+      <div><h2 class="h5 mb-1">Partner image</h2><p class="small text-body-secondary mb-0">Uploaded {{ partner.current_image.uploaded_at|date:"j M Y" }}. Uploading a replacement retains earlier images.</p></div>
+    </div></div></div>
+    {% endif %}
+    {% if partner.images.count > 1 %}
+    <div class="col-12"><div class="card"><div class="card-body">
+      <h2 class="h6">Previous partner images</h2>
+      <div class="d-flex flex-wrap gap-3">
+        {% for image in partner.images.all %}{% if not forloop.first %}
+        <a class="d-flex align-items-center gap-2 text-decoration-none" href="{% url 'partners:partner_image' partner.pk image.pk %}">
+          <img src="{% url 'partners:partner_image' partner.pk image.pk %}" alt="" class="img-thumbnail" style="width: 3.5rem; height: 3.5rem; object-fit: contain">
+          <span class="small">Uploaded {{ image.uploaded_at|date:"j M Y" }}</span>
+        </a>
+        {% endif %}{% endfor %}
+      </div>
+    </div></div></div>
+    {% endif %}
+    <div class="col-lg-5"><div class="card h-100"><div class="card-body">
+      <h2 class="h5">Organisation details</h2>
+      <dl class="row mb-0">
+        <dt class="col-sm-5">Registration number</dt><dd class="col-sm-7">{{ partner.registration_number|default:"—" }}</dd>
+        <dt class="col-sm-5">Sector</dt><dd class="col-sm-7">{{ partner.sector|default:"—" }}</dd>
+        <dt class="col-sm-5">Address</dt><dd class="col-sm-7">{{ partner.address|default:"—"|linebreaksbr }}</dd>
+        <dt class="col-sm-5">Website</dt><dd class="col-sm-7">{% if partner.website %}<a href="{{ partner.website }}" rel="noopener noreferrer">{{ partner.website }}</a>{% else %}—{% endif %}</dd>
+        <dt class="col-sm-5">Province</dt><dd class="col-sm-7">{{ partner.province|default:"—" }}</dd>
+        <dt class="col-sm-5">B-BBEE level</dt><dd class="col-sm-7">{{ partner.bbbee_level|default:"—" }}</dd>
+      </dl>
+    </div></div></div>
+    <div class="col-lg-7"><div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center"><h2 class="h5">Partner representatives</h2>{% if can_update %}<a class="btn btn-sm btn-outline-primary" href="{% url 'partners:representative_add' partner.pk %}">Link existing contact</a>{% endif %}</div>
+      <p class="small text-body-secondary">Contacts are shared stakeholder records; add a new person in the <a href="{% url 'stakeholders:list' %}">Stakeholder Directory</a> first.</p>
+      <div class="list-group list-group-flush">
+        {% for contact in representatives %}
+          <div class="list-group-item px-0 d-flex flex-wrap justify-content-between gap-2">
+            <div><a href="{% url 'stakeholders:detail' contact.pk %}" class="fw-semibold">{{ contact.name }}</a>{% if contact.title %}<div>{{ contact.title }}</div>{% endif %}{% if contact.show_contact_details %}<div class="small"><a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% if contact.phone %} · {{ contact.phone }}{% endif %}</div>{% else %}<div class="small text-body-secondary">Contact details restricted</div>{% endif %}</div>
+            {% if can_update and contact.can_unlink %}<form method="post" action="{% url 'partners:representative_remove' partner.pk contact.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Unlink</button></form>{% endif %}
+          </div>
+        {% empty %}<div class="list-group-item px-0 text-body-secondary">No accessible representatives are linked to this organisation.</div>{% endfor %}
+      </div>
+    </div></div></div>
+  </div>
+  <div class="card mt-3"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center"><h2 class="h5 mb-0">Memoranda of understanding</h2>{% if can_create_mou %}<a class="btn btn-sm btn-primary" href="{% url 'partners:mou_create' %}?partner={{ partner.pk }}">Create MOU</a>{% endif %}</div>
+    <div class="table-responsive mt-3"><table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Title</th><th>Reference</th><th>Status</th><th>End date</th></tr></thead>
+      <tbody>{% for mou in mous %}<tr><td><a href="{% url 'partners:mou_detail' mou.pk %}">{{ mou.title }}</a></td><td>{{ mou.reference|default:"—" }}</td><td>{{ mou.get_status_display }}</td><td>{{ mou.end_date|default:"—" }}</td></tr>
+      {% empty %}<tr><td colspan="4" class="text-body-secondary">No accessible MOUs are linked to this partner.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></div>
+</section>
+{% endblock %}

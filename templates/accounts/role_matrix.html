@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Role permissions | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <h1 class="h2">Role permission matrix</h1>
+  <p class="text-body-secondary">Only Super Admin can change grants. Each action has one scope; “No access” removes its grant.</p>
+  <nav class="nav nav-pills flex-wrap gap-2 mb-4" aria-label="Select role">
+    {% for role in roles %}
+      <a class="nav-link {% if role.pk == selected_role.pk %}active{% endif %}" href="?role={{ role.code }}">{{ role.get_code_display }}</a>
+    {% endfor %}
+  </nav>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="role" value="{{ selected_role.code }}">
+    {% for resource, resource_label in resources %}
+      <div class="card mb-3">
+        <div class="card-header fw-semibold">{{ resource_label }}</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% for row in matrix_rows %}
+              {% if row.resource_label == resource_label %}
+                <div class="col-sm-6 col-lg-3">
+                  <label class="form-label" for="{{ row.field.id_for_label }}">{{ row.action_label }}</label>
+                  {{ row.field }}
+                  {% for error in row.field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Save matrix</button>
+  </form>
+</section>
+{% endblock %}

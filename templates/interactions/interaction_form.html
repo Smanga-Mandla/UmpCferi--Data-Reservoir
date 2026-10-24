@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <p><a href="{% if interaction %}{% url 'interactions:detail' interaction.pk %}{% else %}{% url 'interactions:list' %}{% endif %}">Back</a></p>
+  <div class="row justify-content-center"><div class="col-lg-9">
+    <div class="card"><div class="card-body p-4">
+      <h1 class="h2">{{ title }}</h1>
+      <p class="text-body-secondary">Choose only records and stakeholders you are authorized to access. Leaving links empty is allowed for general interactions.</p>
+      <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          </div>
+        {% endfor %}
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <button class="btn btn-primary">Save interaction</button>
+        <a class="btn btn-outline-secondary" href="{% if interaction %}{% url 'interactions:detail' interaction.pk %}{% else %}{% url 'interactions:list' %}{% endif %}">Cancel</a>
+      </form>
+    </div></div>
+  </div></div>
+</section>
+{% endblock %}

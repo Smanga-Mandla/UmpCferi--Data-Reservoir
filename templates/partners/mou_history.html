@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Agreement history | {{ mou.title }}{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <p><a href="{% url 'partners:mou_detail' mou.pk %}">{{ mou.title }}</a></p>
+  <h1 class="h2">Agreement history</h1>
+  <p class="text-body-secondary">Append-only snapshots preserve the agreement details entered at each create or edit.</p>
+  {% for revision in history %}
+    <article class="card mb-3"><div class="card-header d-flex justify-content-between"><strong>{{ revision.snapshot.title }}</strong><span>{{ revision.created_at }} · {{ revision.changed_by.email }}</span></div>
+      <div class="card-body"><dl class="row mb-0">
+        {% for key, value in revision.snapshot.items %}<dt class="col-sm-4">{{ key|title }}</dt><dd class="col-sm-8">{{ value|default:"—" }}</dd>{% endfor %}
+      </dl></div>
+    </article>
+  {% empty %}<p>No agreement history is available.</p>{% endfor %}
+</section>
+{% endblock %}

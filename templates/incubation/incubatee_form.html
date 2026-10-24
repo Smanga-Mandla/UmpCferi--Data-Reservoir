@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-9"><div class="card"><div class="card-body p-4">
+  <h1 class="h3">{{ title }}</h1><p class="text-body-secondary">Enter the information currently available. Fields not established as mandatory remain optional.</p>
+  <form method="post">{% csrf_token %}
+    {% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <button class="btn btn-primary">{% if create %}Create profile and continue{% else %}Save company information{% endif %}</button>
+    {% if incubatee %}<a class="btn btn-outline-secondary" href="{% url 'incubation:detail' incubatee.pk %}">Cancel</a>{% else %}<a class="btn btn-outline-secondary" href="{% url 'incubation:list' %}">Cancel</a>{% endif %}
+  </form>
+</div></div></div></div></section>
+{% endblock %}

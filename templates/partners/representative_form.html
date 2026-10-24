@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Link partner representative | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-7">
+  <div class="card"><div class="card-body p-4">
+    <h1 class="h3">Link a representative to {{ partner.name }}</h1>
+    <p>Choose an existing stakeholder to reuse the same person record. To add someone new, create a stakeholder record first.</p>
+    <form method="post">{% csrf_token %}<div class="mb-3"><label class="form-label" for="{{ form.stakeholder.id_for_label }}">{{ form.stakeholder.label }}</label>{{ form.stakeholder }}{% for error in form.stakeholder.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div><button class="btn btn-primary">Link contact</button> <a class="btn btn-outline-secondary" href="{% url 'partners:partner_detail' partner.pk %}">Cancel</a></form>
+    <p class="mt-3 mb-0"><a href="{% url 'stakeholders:create' %}?partner={{ partner.pk }}">Create a new stakeholder contact</a></p>
+  </div></div>
+</div></div></section>
+{% endblock %}

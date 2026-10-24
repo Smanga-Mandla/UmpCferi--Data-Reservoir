@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Set up two-factor authentication | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h3">Set up two-factor authentication</h1>
+          <p>Scan this URI with an authenticator app, or enter the secret manually. Your account stays limited to this setup screen until you verify a code.</p>
+          <label class="form-label" for="totp-secret">Setup secret</label>
+          <input id="totp-secret" class="form-control font-monospace mb-3" readonly value="{{ secret }}">
+          <p class="small text-break"><span class="fw-semibold">Provisioning URI:</span> {{ provisioning_uri }}</p>
+          {% if messages %}
+            {% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>{% endfor %}
+          {% endif %}
+          <form method="post">
+            {% csrf_token %}
+            <label class="form-label" for="otp-token">Enter the 6-digit authenticator code</label>
+            <input id="otp-token" name="otp_token" class="form-control mb-3" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+            <button class="btn btn-primary" type="submit">Verify and enable</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

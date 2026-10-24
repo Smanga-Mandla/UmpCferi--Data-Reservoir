@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Import incubatees | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4"><div class="row justify-content-center"><div class="col-lg-8"><div class="card"><div class="card-body p-4">
+  <h1 class="h3">Import incubatees from Excel</h1>
+  <p>Upload an .xlsx file with a header row. Supported columns: <code>legal_name</code> (required), <code>trading_name</code>, <code>cipc_registration_number</code>, <code>date_registered</code>, <code>entity_type</code>, <code>vat_status</code>, <code>tax_number</code>, <code>bbbee_level</code>, <code>physical_address</code>, <code>province</code>, <code>municipality</code>, <code>urban_rural</code>, <code>sic_code</code>, <code>sub_sector</code>, <code>products_services</code>, <code>business_model</code>, <code>business_stage</code>, and <code>formality</code>.</p>
+  <p class="small text-body-secondary">Import creates company baseline rows only, with Applicant status. Review validation results before committing. Founder and sensitive baseline details should be entered through the authorized onboarding flow.</p>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}{% for field in form %}<div class="mb-3"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}</div>{% endfor %}
+    {% for error in errors %}<div class="alert alert-danger">Row {{ error.row }}: {{ error.error }}</div>{% endfor %}
+    <button class="btn btn-primary">Validate workbook</button> <a class="btn btn-outline-secondary" href="{% url 'incubation:list' %}">Cancel</a>
+  </form>
+</div></div></div></div></section>
+{% endblock %}

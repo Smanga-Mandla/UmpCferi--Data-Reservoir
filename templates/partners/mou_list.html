@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}MOUs | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div><h1 class="h2 mb-1">MOUs and agreements</h1><p class="text-body-secondary mb-0">Private agreement records and related documents.</p></div>
+    <div class="d-flex gap-2">
+      {% if can_export %}<a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'mous' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'mous' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>{% endif %}
+      <a class="btn btn-outline-primary" href="{% url 'partners:mou_expiry_alerts' %}">Renewal alerts</a>{% if can_create %}<a class="btn btn-primary" href="{% url 'partners:mou_create' %}">Create MOU</a>{% endif %}
+    </div>
+  </div>
+  <form method="get" class="card card-body mb-3"><div class="row g-2 align-items-end">
+    <div class="col-md-4"><label class="form-label" for="mou-status">Status</label><select class="form-select" id="mou-status" name="status"><option value="">All statuses</option>{% for value, label in statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><button class="btn btn-outline-primary w-100">Filter</button></div>
+  </div></form>
+  <div class="table-responsive"><table class="table table-hover align-middle bg-white">
+    <thead><tr><th>Agreement</th><th>Partner</th><th>Reference</th><th>Status</th><th>End date</th><th>Value (ZAR)</th></tr></thead>
+    <tbody>{% for mou in mous %}<tr><td><a href="{% url 'partners:mou_detail' mou.pk %}">{{ mou.title }}</a></td><td><a href="{% url 'partners:partner_detail' mou.partner_id %}">{{ mou.partner.name }}</a></td><td>{{ mou.reference|default:"—" }}</td><td>{{ mou.get_status_display }}</td><td>{{ mou.end_date|default:"—" }}</td><td>{{ mou.value_zar|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="text-center py-4 text-body-secondary">No MOUs are available.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <a href="{% url 'partners:partner_list' %}">Partner organisations</a>
+</section>
+{% endblock %}
