@@ -26,7 +26,6 @@
       <div class="collapse navbar-collapse" id="siteNavigation">
         <div class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
           {% if user.is_authenticated %}
-            <a class="nav-link" href="{% url 'reporting:dashboard' %}">Dashboard</a>
             <div class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="workspaceNavigation" role="button" data-bs-toggle="dropdown" aria-expanded="false">Workspaces</a>
               <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="workspaceNavigation">
