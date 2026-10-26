@@ -1,10 +1,7 @@
-from datetime import timedelta
-
 from django.contrib.auth import logout
 from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve
-from django.utils import timezone
 
 
 class AccessControlMiddleware:
@@ -17,33 +14,6 @@ class AccessControlMiddleware:
             user.is_active = False
             user.save(update_fields=("is_active",))
             logout(request)
-        return self.get_response(request)
-
-
-class InactivityTimeoutMiddleware:
-    session_key = "_auth_last_activity"
-    timeout = timedelta(minutes=30)
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        user = request.user
-        if user.is_authenticated:
-            now = timezone.now()
-            last_activity = request.session.get(self.session_key)
-            if last_activity is not None:
-                try:
-                    elapsed = now - timezone.datetime.fromtimestamp(
-                        float(last_activity),
-                        tz=timezone.get_current_timezone(),
-                    )
-                except (TypeError, ValueError, OverflowError):
-                    elapsed = self.timeout
-                if elapsed >= self.timeout:
-                    logout(request)
-                    return redirect("accounts:login")
-            request.session[self.session_key] = now.timestamp()
         return self.get_response(request)
 
 

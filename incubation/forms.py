@@ -60,6 +60,8 @@ class CompanyInformationForm(BootstrapModelForm):
             "physical_address",
             "province",
             "municipality",
+            "business_contact_email",
+            "business_contact_number",
             "urban_rural",
         )
         widgets = {

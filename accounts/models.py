@@ -20,6 +20,7 @@ class Role(models.Model):
         CFERI_STAFF = "cferi_staff", "CFERI Staff"
         FREELANCER = "freelancer", "Freelancer"
         EXTERNAL_GUEST = "external_guest", "External Guest"
+        INCUBATEE = "incubatee", "Incubatee"
 
     code = models.CharField(max_length=32, choices=Code.choices, unique=True)
     permissions = models.ManyToManyField(

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Manage Incubatees | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+    <div>
+      <h1 class="h2 mb-1">Manage Incubatees</h1>
+      <p class="text-body-secondary mb-0">Manage invited accounts linked to existing registered businesses.</p>
+    </div>
+    {% if can_add_account %}
+      <a class="btn btn-primary" href="{% url 'incubation:account_create' %}">Add incubatee</a>
+    {% endif %}
+  </div>
+  <div class="alert alert-info" role="note">
+    This account-onboarding extension is proposed and requires CFERI approval before operational use. Contact numbers are not collected pending approval.
+  </div>
+  {% if not has_manageable_businesses %}
+    <div class="alert alert-warning" role="status">
+      No businesses are currently assigned to your account. CFERI Staff can invite representatives only for businesses in their authorized scope. Ask an administrator to assign the existing business to you, then return here to register and send the invitation.
+    </div>
+  {% endif %}
+  <form method="get" class="row g-2 mb-3" role="search">
+    <div class="col-md-6 col-lg-4">
+      <label class="visually-hidden" for="{{ search_form.q.id_for_label }}">Search incubatee accounts</label>
+      {{ search_form.q }}
+    </div>
+    <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Search</button></div>
+    {% if search_query %}<div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:account_list' %}">Clear</a></div>{% endif %}
+  </form>
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead><tr><th>Name</th><th>Email</th><th>Linked businesses</th><th>Category</th><th>Invitation</th><th>Account status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for row in account_rows %}
+          <tr>
+            <td>{{ row.account.user.get_full_name }}</td>
+            <td>{{ row.account.user.email }}</td>
+            <td>{% for business in row.businesses %}<div>{{ business }}</div>{% empty %}—{% endfor %}</td>
+            <td>{{ row.account.get_entrepreneur_category_display }}</td>
+            <td>{{ row.invitation_status|title }}</td>
+            <td>{{ row.account_status }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'incubation:account_profile' row.account.pk %}">View profile</a>
+              {% if row.invitation_status == "expired" and row.account.user.is_active %}
+                <form class="d-inline" method="post" action="{% url 'incubation:account_resend_invitation' row.account.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Resend invitation</button>
+                </form>
+              {% endif %}
+              {% if row.account.user.is_active %}
+                <form class="d-inline" method="post" action="{% url 'incubation:account_status' row.account.pk %}">
+                  {% csrf_token %}<input type="hidden" name="status" value="suspended">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Suspend</button>
+                </form>
+              {% else %}
+                <form class="d-inline" method="post" action="{% url 'incubation:account_status' row.account.pk %}">
+                  {% csrf_token %}<input type="hidden" name="status" value="active">
+                  <button class="btn btn-sm btn-outline-success" type="submit">Reactivate</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4">No incubatee accounts match this search.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

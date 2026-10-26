@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Business Challenges | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <p><a href="{% url 'incubation:incubatee_dashboard' %}">My dashboard</a></p>
+  <h1 class="h2">Business Challenges</h1>
+  <p class="text-body-secondary">{{ business.legal_name }}</p>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Report a challenge</h2>
+    <form method="post" enctype="multipart/form-data" action="{% url 'incubation:challenge_submit' business.pk %}" novalidate>
+      {% csrf_token %}
+      <div class="row g-3">{% for field in form %}<div class="col-12">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+        {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>{% endfor %}</div>
+      <button class="btn btn-primary mt-3" type="submit">Submit challenge</button>
+    </form>
+  </div></section>
+  <section class="card"><div class="card-body"><h2 class="h5">Challenge history</h2>
+    <div class="table-responsive"><table class="table align-middle">
+      <thead><tr><th>Reported</th><th>Category</th><th>Description</th><th>Status</th><th>Evidence</th><th>Review note</th></tr></thead>
+      <tbody>{% for challenge in challenges %}
+        <tr><td>{{ challenge.reported_at|date:"j M Y" }}</td><td>{{ challenge.get_category_display }}</td><td>{{ challenge.description }}</td><td>{{ challenge.get_status_display }}</td>
+          <td>{% if challenge.evidence %}<a href="{% url 'incubation:progress_evidence_download' business.pk 'challenge' challenge.pk %}">{{ challenge.evidence_original_filename|default:"Download evidence" }}</a>{% else %}—{% endif %}</td>
+          <td>{% if challenge.reviews.first %}{{ challenge.reviews.first.review_note|default:"Reviewed" }}{% else %}Pending review{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="6" class="text-body-secondary">No challenges reported.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></section>
+</main>
+{% endblock %}

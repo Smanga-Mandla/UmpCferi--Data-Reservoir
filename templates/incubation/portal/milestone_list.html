@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Business Milestones | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <h1 class="h2">Business Milestones</h1>
+  <p class="text-body-secondary">{{ business.legal_name }}</p>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Record a milestone</h2>
+    <form method="post" enctype="multipart/form-data" action="{% url 'incubation:milestone_submit' business.pk %}" novalidate>
+      {% csrf_token %}
+      <div class="row g-3">{% for field in form %}<div class="col-12 col-md-6">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+        {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+      </div>{% endfor %}</div>
+      <button class="btn btn-primary mt-3" type="submit">Save milestone</button>
+    </form>
+  </div></section>
+  <section class="card"><div class="card-body"><h2 class="h5">Milestone history</h2>
+    <div class="table-responsive"><table class="table align-middle">
+      <thead><tr><th>Milestone</th><th>Date</th><th>Description</th><th>Evidence</th><th>Review status</th></tr></thead>
+      <tbody>{% for milestone in milestones %}
+        <tr><td>{{ milestone.title|default:milestone.get_milestone_type_display }}</td><td>{{ milestone.milestone_date|date:"j M Y" }}</td><td>{{ milestone.description|default:"—" }}</td>
+          <td>{% if milestone.evidence %}<a href="{% url 'incubation:progress_evidence_download' business.pk 'milestone' milestone.pk %}">{{ milestone.original_filename|default:"Download evidence" }}</a>{% else %}—{% endif %}</td>
+          <td>{% if milestone.reviews.first %}{{ milestone.reviews.first.get_status_display }}{% else %}Pending review{% endif %}</td>
+        </tr>
+      {% empty %}<tr><td colspan="5" class="text-body-secondary">No business milestones recorded.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></section>
+</main>
+{% endblock %}

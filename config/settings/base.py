@@ -52,7 +52,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "audit.middleware.AuditActorMiddleware",
     "accounts.middleware.AccessControlMiddleware",
-    "accounts.middleware.InactivityTimeoutMiddleware",
     "accounts.middleware.MfaEnforcementMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -93,12 +92,10 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 PASSWORD_RESET_TIMEOUT = 30 * 60
-SESSION_COOKIE_AGE = 30 * 60
-SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "reporting:dashboard"
-LOGOUT_REDIRECT_URL = "home"
+LOGOUT_REDIRECT_URL = "accounts:login"
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -119,7 +116,9 @@ STATIC_URL = "/static/"
 MEDIA_URL = ""
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "var" / "static"
-PRIVATE_MEDIA_ROOT = BASE_DIR / "var" / "private-media"
+PRIVATE_MEDIA_ROOT = Path(
+    os.environ.get("PRIVATE_MEDIA_ROOT", BASE_DIR / "var" / "private-media")
+).resolve()
 STORAGES = {
     "default": {"BACKEND": "config.storage.PrivateMediaStorage"},
     "staticfiles": {

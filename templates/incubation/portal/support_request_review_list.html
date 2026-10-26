@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Support Request Reviews | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <h1 class="h2">Support Request Reviews</h1>
+  <p class="text-body-secondary">Requests are limited to businesses within your authorized review scope.</p>
+  {% for support_request in requests %}
+    <article class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+          <h2 class="h5">{{ support_request.get_category_display }} · {{ support_request.incubatee.legal_name }}</h2>
+          <span class="badge text-bg-secondary">{{ support_request.get_status_display }}</span>
+        </div>
+        <p>{{ support_request.description }}</p>
+        <p class="small text-body-secondary">Submitted by {{ support_request.requested_by.get_full_name|default:support_request.requested_by.email }} on {{ support_request.submitted_at|date:"j M Y, H:i" }}{% if support_request.priority %} · Priority: {{ support_request.get_priority_display }}{% endif %}</p>
+        {% if support_request.evidence %}<p><a href="{% url 'incubation:support_request_evidence_download' support_request.incubatee_id support_request.pk %}">View private supporting document</a></p>{% endif %}
+        <form method="post" action="{% url 'incubation:support_request_review' support_request.pk %}" novalidate>
+          {% csrf_token %}
+          <div class="row g-3">
+            {% for field in support_request.review_form %}
+              <div class="{% if field.name == 'response' %}col-12{% else %}col-12 col-md-6{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Assign and respond</button>
+        </form>
+        {% if support_request.updates.all %}
+          <hr><h3 class="h6">Update history</h3>
+          <ul class="list-group list-group-flush">
+            {% for update in support_request.updates.all %}
+              <li class="list-group-item px-0"><strong>{{ update.get_status_display|default:"Updated" }}</strong> · {{ update.created_at|date:"j M Y, H:i" }} · {{ update.updated_by.get_full_name|default:update.updated_by.email }}{% if update.assigned_to %} · Assigned to {{ update.assigned_to.get_full_name|default:update.assigned_to.email }}{% endif %}{% if update.response %}<p class="mb-0 mt-1">{{ update.response }}</p>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </article>
+  {% empty %}<div class="alert alert-info">No support requests are in your authorized scope.</div>{% endfor %}
+</main>
+{% endblock %}

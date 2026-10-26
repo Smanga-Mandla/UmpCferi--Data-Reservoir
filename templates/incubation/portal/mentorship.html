@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}My Mentorship | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <h1 class="h2">My Mentorship</h1>
+  <p class="text-body-secondary">{{ business.legal_name }}</p>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Assigned mentor{{ mentors|length|pluralize }}</h2>
+    <ul class="list-group list-group-flush">
+      {% for mentor in mentors %}
+        <li class="list-group-item px-0"><strong>{{ mentor.name }}</strong>{% if mentor.title %}<span class="text-body-secondary"> · {{ mentor.title }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div></section>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Scheduled and previous mentorship sessions</h2>
+    <div class="table-responsive"><table class="table align-middle">
+      <thead><tr><th>Scheduled date</th><th>Mentor</th><th>Status</th><th>Session information</th><th>Recorded rating</th></tr></thead>
+      <tbody>{% for session in sessions %}
+        <tr>
+          <td>{{ session.session_date|date:"j M Y" }}</td>
+          <td>{{ session.mentor.name|default:"Not specified" }}</td>
+          <td>{% if session.session_date >= today %}Scheduled{% else %}Previous session{% endif %}</td>
+          <td>{{ session.topics|default:"No session information recorded." }}</td>
+          <td>{{ session.progress_rating|default:"Not recorded" }}</td>
+        </tr>
+      {% empty %}<tr><td colspan="5" class="text-body-secondary">No mentorship sessions have been recorded.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div></section>
+  <section class="card"><div class="card-body">
+    <h2 class="h5">Mentorship interactions</h2>
+    <ul class="list-group list-group-flush">
+      {% for interaction in interactions %}
+        <li class="list-group-item px-0 d-flex flex-wrap justify-content-between gap-2">
+          <span>{{ interaction.get_interaction_type_display }} interaction</span>
+          <time datetime="{{ interaction.occurred_at|date:'c' }}">{{ interaction.occurred_at|date:"j M Y, H:i" }}</time>
+        </li>
+      {% empty %}<li class="list-group-item px-0 text-body-secondary">No mentoring interactions are available for this business.</li>{% endfor %}
+    </ul>
+  </div></section>
+</main>
+{% endblock %}

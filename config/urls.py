@@ -1,13 +1,17 @@
 from django.contrib import admin
 from django.urls import include, path
-from django.views.generic import TemplateView
+from django.views.generic import RedirectView
 
 from config.health import health_check
 
 handler403 = "config.errors.permission_denied"
 
 urlpatterns = [
-    path("", TemplateView.as_view(template_name="pages/home.html"), name="home"),
+    path(
+        "",
+        RedirectView.as_view(pattern_name="accounts:login", permanent=False),
+        name="home",
+    ),
     path("health/", health_check, name="health"),
     path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls")),

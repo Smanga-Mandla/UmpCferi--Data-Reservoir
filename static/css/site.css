@@ -176,6 +176,9 @@ body {
 }
 
 .dashboard-sidebar {
+  position: sticky;
+  top: 4.75rem;
+  align-self: start;
   min-width: 0;
 }
 
@@ -288,8 +291,7 @@ body {
 }
 
 .dashboard-sidebar .list-group {
-  position: sticky;
-  top: 4.75rem;
+  position: static;
   max-height: calc(100vh - 5.5rem);
   overflow: hidden;
   overflow-y: auto;
@@ -690,6 +692,8 @@ body {
   }
 
   .dashboard-sidebar {
+    position: static;
+    top: auto;
     padding: 0 0 1rem;
   }
 

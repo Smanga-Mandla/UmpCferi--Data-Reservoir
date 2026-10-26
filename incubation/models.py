@@ -1,8 +1,9 @@
 import uuid
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.storage import FileSystemStorage
 from django.db import models, transaction
 from django.db.models import Q
@@ -23,6 +24,23 @@ def incubatee_document_path(instance, filename):
     if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
         extension = ""
     return f"incubatees/{instance.incubatee_id}/{instance.pk}{extension}"
+
+
+def business_document_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:16]
+    if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
+        extension = ""
+    return (
+        f"business-documents/{instance.document.incubatee_id}/"
+        f"{instance.document_id}/{instance.pk}{extension}"
+    )
+
+
+def support_request_evidence_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:16]
+    if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
+        extension = ""
+    return f"incubatees/{instance.incubatee_id}/support-requests/{uuid.uuid4()}{extension}"
 
 
 class Programme(models.Model):
@@ -125,6 +143,8 @@ class Incubatee(AccessControlledModel):
     physical_address = models.TextField(blank=True)
     province = models.CharField(max_length=128, blank=True)
     municipality = models.CharField(max_length=128, blank=True)
+    business_contact_email = models.EmailField(blank=True)
+    business_contact_number = models.CharField(max_length=32, blank=True)
     urban_rural = models.CharField(max_length=16, choices=UrbanRural.choices, blank=True)
 
     sic_code = models.CharField(max_length=32, blank=True)
@@ -247,6 +267,238 @@ class Incubatee(AccessControlledModel):
 
     def __str__(self):
         return self.trading_name or self.legal_name
+
+
+class IncubateeAccount(models.Model):
+    class EntrepreneurCategory(models.TextChoices):
+        STUDENT_ENTREPRENEUR = "student_entrepreneur", "Student Entrepreneur"
+        EXTERNAL_SME = "external_sme", "External SME"
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_account",
+    )
+    entrepreneur_category = models.CharField(
+        max_length=32,
+        choices=EntrepreneurCategory.choices,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_incubatee_accounts",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    invitation_sent_at = models.DateTimeField(null=True, blank=True)
+    invitation_accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("user__last_name", "user__first_name", "user__email")
+
+    @property
+    def invitation_status(self):
+        if self.invitation_accepted_at:
+            return "accepted"
+        if not self.invitation_sent_at:
+            return "not_sent"
+        if self.invitation_sent_at + timedelta(
+            seconds=settings.PASSWORD_RESET_TIMEOUT
+        ) <= timezone.now():
+            return "expired"
+        return "pending"
+
+    @property
+    def account_status(self):
+        if not self.user.is_active:
+            return "Suspended"
+        if not self.invitation_accepted_at:
+            return "Pending activation"
+        return "Active"
+
+
+class IncubateeAccountBusiness(models.Model):
+    account = models.ForeignKey(
+        IncubateeAccount,
+        on_delete=models.PROTECT,
+        related_name="business_links",
+    )
+    incubatee = models.ForeignKey(
+        Incubatee,
+        on_delete=models.PROTECT,
+        related_name="account_links",
+    )
+    linked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="linked_incubatee_accounts",
+    )
+    linked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("incubatee__legal_name",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("account", "incubatee"),
+                name="unique_account_business_link",
+            ),
+        ]
+
+
+class IncubateeProfileChange(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        STALE = "stale", "Needs resubmission"
+
+    incubatee = models.ForeignKey(
+        Incubatee, on_delete=models.PROTECT, related_name="profile_change_requests"
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_profile_change_requests",
+    )
+    request_note = models.TextField(blank=True)
+    old_values = models.JSONField()
+    proposed_values = models.JSONField()
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="reviewed_incubatee_profile_changes",
+    )
+    review_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "incubatee_id",
+                    "requested_by_id",
+                    "request_note",
+                    "old_values",
+                    "proposed_values",
+                    "created_at",
+                )
+            ):
+                raise PermissionDenied("Profile change request details are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Profile change requests are retained as history.")
+
+
+class BusinessDocument(models.Model):
+    class Category(models.TextChoices):
+        CIPC_REGISTRATION = "cipc_registration", "CIPC registration document"
+        SARS_TAX = "sars_tax", "SARS tax document"
+        BBBEE = "bbbee", "B-BBEE certificate or affidavit"
+        BUSINESS_PLAN = "business_plan", "Business plan"
+        FINANCIAL_STATEMENT = "financial_statement", "Financial statement"
+        PROOF_OF_ADDRESS = "proof_of_address", "Proof of business address"
+        OTHER = "other", "Other approved SME document"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    incubatee = models.ForeignKey(
+        Incubatee, on_delete=models.PROTECT, related_name="business_documents"
+    )
+    title = models.CharField(max_length=255)
+    category = models.CharField(max_length=32, choices=Category.choices)
+    description = models.TextField(blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_business_documents",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="reviewed_business_documents",
+    )
+    review_note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("category", "title", "created_at")
+
+    @property
+    def current_version(self):
+        return self.versions.filter(is_current=True).first()
+
+    @property
+    def display_status(self):
+        if self.expiry_date and self.expiry_date < timezone.localdate():
+            return "Expired"
+        return self.get_status_display()
+
+    def __str__(self):
+        return self.title
+
+
+class BusinessDocumentVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document = models.ForeignKey(
+        BusinessDocument, on_delete=models.PROTECT, related_name="versions"
+    )
+    file = models.FileField(upload_to=business_document_path, max_length=512)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=127)
+    size_bytes = models.PositiveBigIntegerField()
+    version_number = models.PositiveIntegerField()
+    metadata_snapshot = models.JSONField(default=dict)
+    change_note = models.CharField(max_length=500, blank=True)
+    is_current = models.BooleanField(default=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="business_document_versions",
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-version_number",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("document", "version_number"),
+                name="unique_business_document_version_number",
+            ),
+            models.UniqueConstraint(
+                fields=("document",),
+                condition=Q(is_current=True),
+                name="unique_current_business_document_version",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk and type(self).objects.filter(pk=self.pk).exists():
+            raise PermissionDenied("Business document versions are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Business document versions are retained as history.")
 
 
 class FounderProfile(models.Model):
@@ -592,6 +844,12 @@ class IncubateeMetricObservation(models.Model):
         NEW_CUSTOMERS = "new_customers", "New customers this month"
         FULL_TIME_EMPLOYEES = "full_time_employees", "Full-time employees"
         PART_TIME_EMPLOYEES = "part_time_employees", "Part-time employees"
+        FULL_TIME_MEN = "full_time_men", "Full-time men"
+        FULL_TIME_WOMEN = "full_time_women", "Full-time women"
+        FULL_TIME_YOUTH = "full_time_youth", "Full-time youth"
+        PART_TIME_MEN = "part_time_men", "Part-time men"
+        PART_TIME_WOMEN = "part_time_women", "Part-time women"
+        PART_TIME_YOUTH = "part_time_youth", "Part-time youth"
         JOBS_CREATED = "jobs_created", "Jobs created"
         JOBS_LOST = "jobs_lost", "Jobs lost"
         FUNDING_APPLIED_ZAR = "funding_applied_zar", "Funding applied for (ZAR)"
@@ -807,17 +1065,20 @@ class MonthlyCheckInEvidence(models.Model):
 
 class IncubateeMilestone(models.Model):
     class Type(models.TextChoices):
+        BUSINESS_REGISTRATION = "business_registration", "Business registration completed"
         FIRST_SALE = "first_sale", "First sale"
         FIRST_HIRE = "first_hire", "First hire"
         FUNDING_RAISED = "funding_raised", "Funding raised"
         NEW_CONTRACT = "new_contract", "New contract"
         AWARD = "award", "Award"
         PRODUCT_LAUNCH = "product_launch", "Product launch"
+        NEW_MARKET = "new_market", "New market entered"
 
+    title = models.CharField(max_length=255, blank=True)
     incubatee = models.ForeignKey(
         Incubatee, on_delete=models.PROTECT, related_name="milestones"
     )
-    milestone_type = models.CharField(max_length=24, choices=Type.choices)
+    milestone_type = models.CharField(max_length=32, choices=Type.choices)
     milestone_date = models.DateField()
     value_zar = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
     description = models.TextField(blank=True)
@@ -850,6 +1111,394 @@ class IncubateeMilestone(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Milestone records are retained as historical records.")
+
+    @property
+    def review_status(self):
+        latest_review = self.reviews.first()
+        return latest_review.status if latest_review else "pending"
+
+
+class IncubateeProgressSubmission(models.Model):
+    checkin = models.OneToOneField(
+        MonthlyCheckIn, on_delete=models.PROTECT, related_name="portal_submission"
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_progress_submissions",
+    )
+    business_achievements = models.TextField(blank=True)
+    challenges_experienced = models.TextField(blank=True)
+    additional_comments = models.TextField(blank=True)
+    submitted_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-checkin__period_start", "-submitted_at")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "checkin_id",
+                    "submitted_by_id",
+                    "business_achievements",
+                    "challenges_experienced",
+                    "additional_comments",
+                    "submitted_at",
+                )
+            ):
+                raise PermissionDenied("Submitted progress content is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Progress submissions are retained as history.")
+
+    @property
+    def review_status(self):
+        latest_review = self.reviews.first()
+        return latest_review.status if latest_review else "submitted"
+
+    @property
+    def review_note(self):
+        latest_review = self.reviews.first()
+        return latest_review.review_note if latest_review else ""
+
+    @property
+    def review_status_display(self):
+        latest_review = self.reviews.first()
+        return latest_review.get_status_display() if latest_review else "Submitted"
+
+
+class IncubateeProgressReview(models.Model):
+    class Status(models.TextChoices):
+        REVIEWED = "reviewed", "Reviewed"
+        CLARIFICATION_REQUESTED = "clarification_requested", "Clarification requested"
+
+    submission = models.ForeignKey(
+        IncubateeProgressSubmission, on_delete=models.PROTECT, related_name="reviews"
+    )
+    status = models.CharField(max_length=32, choices=Status.choices)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_progress_reviews",
+    )
+    review_note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-reviewed_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise PermissionDenied("Progress review history is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Progress review history is retained.")
+
+
+class IncubateeMilestoneReview(models.Model):
+    class Status(models.TextChoices):
+        APPROVED = "approved", "Reviewed"
+        CLARIFICATION_REQUESTED = "clarification_requested", "Clarification requested"
+        NOT_VERIFIED = "not_verified", "Not verified"
+
+    milestone = models.ForeignKey(
+        IncubateeMilestone, on_delete=models.PROTECT, related_name="reviews"
+    )
+    status = models.CharField(max_length=32, choices=Status.choices)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_milestone_reviews",
+    )
+    review_note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-reviewed_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise PermissionDenied("Milestone review history is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Milestone review history is retained.")
+
+
+def challenge_evidence_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:16]
+    if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
+        extension = ""
+    return f"incubatees/{instance.incubatee_id}/challenges/{uuid.uuid4()}{extension}"
+
+
+class IncubateeBusinessChallenge(models.Model):
+    class Category(models.TextChoices):
+        FUNDING = "funding", "Lack of funding"
+        MARKETING = "marketing", "Marketing difficulties"
+        EQUIPMENT = "equipment", "Equipment shortages"
+        COMPLIANCE = "compliance", "Compliance problems"
+        OPERATIONS = "operations", "Operational challenges"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_PROGRESS = "in_progress", "In progress"
+        RESOLVED = "resolved", "Resolved"
+
+    description = models.TextField()
+    incubatee = models.ForeignKey(
+        Incubatee, on_delete=models.PROTECT, related_name="business_challenges"
+    )
+    category = models.CharField(max_length=24, choices=Category.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reported_incubatee_challenges",
+    )
+    reported_at = models.DateTimeField(auto_now_add=True)
+    evidence = models.FileField(upload_to=challenge_evidence_path, blank=True)
+    evidence_original_filename = models.CharField(max_length=255, blank=True)
+    evidence_content_type = models.CharField(max_length=127, blank=True)
+    evidence_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-reported_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "description",
+                    "incubatee_id",
+                    "category",
+                    "reported_by_id",
+                    "reported_at",
+                    "evidence",
+                    "evidence_original_filename",
+                    "evidence_content_type",
+                    "evidence_size_bytes",
+                )
+            ):
+                raise PermissionDenied("Business challenge content is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Business challenge submissions are retained.")
+
+    @property
+    def review_status(self):
+        latest_review = self.reviews.first()
+        return latest_review.status if latest_review else "pending"
+
+
+class IncubateeChallengeReview(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_PROGRESS = "in_progress", "In progress"
+        RESOLVED = "resolved", "Resolved"
+
+    challenge = models.ForeignKey(
+        IncubateeBusinessChallenge, on_delete=models.PROTECT, related_name="reviews"
+    )
+    status = models.CharField(max_length=32, choices=Status.choices)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_challenge_reviews",
+    )
+    review_note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-reviewed_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise PermissionDenied("Challenge review history is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Challenge review history is retained.")
+
+
+class IncubateeSupportRequest(models.Model):
+    class Category(models.TextChoices):
+        MENTORSHIP = "mentorship", "Business mentorship"
+        FINANCIAL_MANAGEMENT = "financial_management", "Financial management assistance"
+        MARKETING = "marketing", "Marketing support"
+        REGISTRATION_COMPLIANCE = "registration_compliance", "Business registration and compliance"
+        FUNDING_GUIDANCE = "funding_guidance", "Funding application guidance"
+        TECHNOLOGY = "technology", "Technology support"
+        TRAINING = "training", "Training and workshops"
+        OTHER = "other", "Other business development assistance"
+
+    class Priority(models.TextChoices):
+        LOW = "low", "Low"
+        NORMAL = "normal", "Normal"
+        HIGH = "high", "High"
+
+    class Status(models.TextChoices):
+        SUBMITTED = "submitted", "Submitted"
+        UNDER_REVIEW = "under_review", "Under Review"
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETED = "completed", "Completed"
+        REJECTED = "rejected", "Rejected"
+
+    incubatee = models.ForeignKey(
+        Incubatee, on_delete=models.PROTECT, related_name="support_requests"
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_support_requests",
+    )
+    category = models.CharField(max_length=32, choices=Category.choices)
+    description = models.TextField()
+    priority = models.CharField(max_length=16, choices=Priority.choices, blank=True)
+    status = models.CharField(
+        max_length=24, choices=Status.choices, default=Status.SUBMITTED
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="assigned_incubatee_support_requests",
+    )
+    evidence = models.FileField(
+        upload_to=support_request_evidence_path, max_length=512, blank=True
+    )
+    evidence_original_filename = models.CharField(max_length=255, blank=True)
+    evidence_content_type = models.CharField(max_length=127, blank=True)
+    evidence_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-submitted_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "incubatee_id",
+                    "requested_by_id",
+                    "category",
+                    "description",
+                    "priority",
+                    "evidence",
+                    "evidence_original_filename",
+                    "evidence_content_type",
+                    "evidence_size_bytes",
+                    "submitted_at",
+                )
+            ):
+                raise PermissionDenied("Support request details are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Support requests are retained as history.")
+
+
+class IncubateeSupportRequestUpdate(models.Model):
+    support_request = models.ForeignKey(
+        IncubateeSupportRequest, on_delete=models.PROTECT, related_name="updates"
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=IncubateeSupportRequest.Status.choices,
+        blank=True,
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="incubatee_support_request_assignments",
+    )
+    response = models.TextField(blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_support_request_updates",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise PermissionDenied("Support request updates are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Support request updates are retained.")
+
+
+class IncubateePortalNotification(models.Model):
+    class Type(models.TextChoices):
+        SUPPORT_REQUEST = "support_request", "Support request update"
+        PROFILE_CHANGE = "profile_change", "Business profile change"
+        PROGRESS_DEADLINE = "progress_deadline", "Monthly progress"
+        DOCUMENT_EXPIRY = "document_expiry", "Business document expiry"
+        MENTORSHIP = "mentorship", "Mentorship"
+        ACCOUNT = "account", "Account"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="incubatee_portal_notifications",
+    )
+    incubatee = models.ForeignKey(
+        Incubatee,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="portal_notifications",
+    )
+    notification_type = models.CharField(max_length=24, choices=Type.choices)
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+    email_attempted_at = models.DateTimeField(null=True, blank=True)
+    email_error = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "user_id",
+                    "incubatee_id",
+                    "notification_type",
+                    "title",
+                    "message",
+                    "created_at",
+                )
+            ):
+                raise PermissionDenied("Notification content is immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Notifications are retained as history.")
 
 
 class MentoringSession(models.Model):

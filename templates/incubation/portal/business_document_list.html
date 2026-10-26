@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}My Business Documents | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+    <div><h1 class="h2">My Business Documents</h1><p class="text-body-secondary mb-0">{{ business.legal_name }}</p></div>
+    {% if can_upload %}<a class="btn btn-primary" href="{% url 'incubation:business_document_upload' business.pk %}">Upload document</a>{% endif %}
+    {% if is_reviewer %}<a class="btn btn-outline-primary" href="{% url 'incubation:business_document_review_list' %}">Review queue</a>{% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle">
+      <thead><tr><th>Document</th><th>Category</th><th>Uploaded</th><th>Expiry</th><th>Status</th><th>Version</th></tr></thead>
+      <tbody>
+        {% for document in documents %}
+          {% with current=document.current_version %}
+            <tr>
+              <td><a href="{% url 'incubation:business_document_detail' business.pk document.pk %}">{{ document.title }}</a></td>
+              <td>{{ document.get_category_display }}</td>
+              <td>{% if current %}{{ current.uploaded_at|date:"j M Y" }}{% else %}—{% endif %}</td>
+              <td>{{ document.expiry_date|date:"j M Y"|default:"—" }}</td>
+              <td>{{ document.display_status }}</td>
+              <td>{% if current %}v{{ current.version_number }}{% else %}—{% endif %}</td>
+            </tr>
+          {% endwith %}
+        {% empty %}
+          <tr><td colspan="6" class="text-body-secondary">No business documents have been uploaded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</main>
+{% endblock %}

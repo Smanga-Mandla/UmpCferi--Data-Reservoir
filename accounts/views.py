@@ -17,7 +17,7 @@ from django.contrib.auth.views import (
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -36,6 +36,11 @@ from accounts.models import Role, RoleGrant, TOTPDevice
 class EmailLoginView(LoginView):
     template_name = "accounts/login.html"
     authentication_form = EmailAuthenticationForm
+
+    def get_success_url(self):
+        if self.request.user.roles.filter(code=Role.Code.INCUBATEE).exists():
+            return reverse("incubation:incubatee_dashboard")
+        return super().get_success_url()
 
     def form_valid(self, form):
         user = form.get_user()
@@ -68,7 +73,9 @@ class UserLogoutView(LogoutView):
 
 
 def _has_user_admin_role(user):
-    return user.is_authenticated and (
+    return user.is_authenticated and not user.roles.filter(
+        code=Role.Code.INCUBATEE
+    ).exists() and (
         user.is_superuser
         or user.roles.filter(
             code__in=(Role.Code.SUPER_ADMIN, Role.Code.SYSTEM_ADMIN)
@@ -77,7 +84,9 @@ def _has_user_admin_role(user):
 
 
 def _is_super_admin(user):
-    return user.is_authenticated and (
+    return user.is_authenticated and not user.roles.filter(
+        code=Role.Code.INCUBATEE
+    ).exists() and (
         user.is_superuser or user.roles.filter(code=Role.Code.SUPER_ADMIN).exists()
     )
 
@@ -204,6 +213,8 @@ def edit_user_access(request, user_id):
     if not _has_user_admin_role(request.user):
         raise PermissionDenied
     target = get_object_or_404(get_user_model(), pk=user_id)
+    if target.roles.filter(code=Role.Code.INCUBATEE).exists():
+        raise PermissionDenied("Manage incubatee accounts through Manage Incubatees.")
     if target.pk == request.user.pk:
         raise PermissionDenied("You cannot change your own roles or access expiry.")
     if (
@@ -237,6 +248,8 @@ def deactivate_user(request, user_id):
     if not _has_user_admin_role(request.user):
         raise PermissionDenied
     target = get_object_or_404(get_user_model(), pk=user_id)
+    if target.roles.filter(code=Role.Code.INCUBATEE).exists():
+        raise PermissionDenied("Manage incubatee accounts through Manage Incubatees.")
     if target.pk == request.user.pk:
         raise PermissionDenied("You cannot deactivate your own account.")
     if (
@@ -267,6 +280,14 @@ class UserPasswordResetConfirmView(PasswordResetConfirmView):
     form_class = SetPasswordForm
     success_url = reverse_lazy("accounts:password_reset_complete")
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        account = getattr(form.user, "incubatee_account", None)
+        if account and account.invitation_accepted_at is None:
+            account.invitation_accepted_at = timezone.now()
+            account.save(update_fields=("invitation_accepted_at",))
+        return response
+
 
 class UserPasswordResetCompleteView(PasswordResetCompleteView):
     template_name = "accounts/password_reset_complete.html"
@@ -274,7 +295,7 @@ class UserPasswordResetCompleteView(PasswordResetCompleteView):
 
 @user_passes_test(_is_super_admin, login_url="accounts:login")
 def role_matrix(request):
-    roles = Role.objects.order_by("code")
+    roles = Role.objects.exclude(code=Role.Code.INCUBATEE).order_by("code")
     role_code = request.POST.get("role") if request.method == "POST" else request.GET.get("role")
     selected_role = get_object_or_404(roles, code=role_code) if role_code else roles.first()
     if selected_role is None:

@@ -115,6 +115,11 @@ class ReportingAndAuditTests(TestCase):
             response = self.client.get(reverse(route))
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, "Incubatees by status")
+            self.assertContains(
+                response,
+                f'href="{reverse("reporting:impact")}">Reports</a>',
+            )
+            self.assertNotContains(response, ">Impact report</a>")
 
     def test_dashboard_home_shows_super_admin_operational_data_not_role_links(self):
         super_admin = self.create_user(

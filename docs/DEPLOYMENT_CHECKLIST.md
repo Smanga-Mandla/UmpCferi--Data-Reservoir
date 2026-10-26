@@ -33,6 +33,7 @@ This checklist is operational guidance, not authorization to deploy. Do not expo
 
 - [ ] Back up private uploaded media separately from public/static assets; test restoration and verify private permissions after restore.
 - [ ] Keep static assets and private uploads in distinct storage locations. Never publish `PRIVATE_MEDIA_ROOT`.
+- [ ] In production, set `PRIVATE_MEDIA_ROOT` to a private persistent volume (for Render, the attached persistent disk mount); the application refuses production startup when this is unset.
 - [ ] Verify any external/private storage backend's encryption, access policies, retention, and backup behavior before use.
 
 ## Accounts and authorization

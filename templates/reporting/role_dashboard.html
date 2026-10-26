@@ -5,7 +5,6 @@
       <p class="text-primary fw-semibold text-uppercase small mb-2">CFERI overview</p>
       <div class="d-flex justify-content-between align-items-start">
         <div><h1 class="h2">Dashboard</h1><p class="text-body-secondary">Current operational information available to your account.</p></div>
-        {% if can_view_impact %}<a class="btn btn-outline-primary" href="{% url 'reporting:impact' %}">Impact report</a>{% endif %}
         {% if can_export_dashboard %}<a class="btn btn-outline-success" href="{% url 'reporting:dashboard_export' role.code 'xlsx' %}">Export Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:dashboard_export' role.code 'pdf' %}">Export PDF</a>{% endif %}
       </div>
       {% if system_health_only %}

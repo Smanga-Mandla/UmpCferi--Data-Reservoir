@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div><p class="text-body-secondary mb-1">CFERI Staff workspace</p><h1 class="h2 mb-1">{{ page_title }}</h1><p class="text-body-secondary mb-0">Records shown are restricted to businesses in your authorized read and update scope.</p></div>
+    <a class="btn btn-outline-primary" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>
+  </div>
+  <nav class="nav nav-pills flex-wrap gap-2 mb-4" aria-label="Progress queue pages">
+    <a class="nav-link" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>
+    <a class="nav-link {% if queue_type == 'outstanding' %}active{% endif %}" href="{% url 'incubation:staff_outstanding_progress' %}">Outstanding progress submissions</a>
+    <a class="nav-link {% if queue_type == 'recent' %}active{% endif %}" href="{% url 'incubation:staff_recent_progress' %}">Recently submitted progress</a>
+  </nav>
+  <form method="get" class="card card-body mb-4">
+    <div class="row g-2 align-items-end">
+      {% for field in monitoring_filter %}
+        <div class="col-sm-6 col-lg"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<div class="small text-danger">{{ error }}</div>{% endfor %}</div>
+      {% endfor %}
+      <div class="col-auto"><button class="btn btn-primary" type="submit">Filter</button></div>
+      {% if queue_type == 'outstanding' %}<div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:staff_outstanding_progress' %}">Clear</a></div>{% else %}<div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:staff_recent_progress' %}">Clear</a></div>{% endif %}
+    </div>
+  </form>
+  <section class="card"><div class="card-body">
+    <div class="table-responsive"><table class="table table-striped align-middle">
+      {% if queue_type == "outstanding" %}
+        <thead><tr><th>Business</th><th>Reporting period</th><th>Due date</th></tr></thead><tbody>
+          {% for checkin in progress_page %}<tr><td><a href="{% url 'incubation:detail' checkin.incubatee_id %}">{{ checkin.incubatee.legal_name }}</a></td><td>{{ checkin.period_start|date:"F Y" }}</td><td>{{ checkin.due_date|date:"j F Y" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No outstanding submissions match these filters.</td></tr>{% endfor %}
+        </tbody>
+      {% else %}
+        <thead><tr><th>Business</th><th>Reporting period</th><th>Submitted</th><th>Review status</th></tr></thead><tbody>
+          {% for submission in progress_page %}<tr><td><a href="{% url 'incubation:detail' submission.incubatee_id %}">{{ submission.incubatee.legal_name }}</a></td><td>{{ submission.period_start|date:"F Y" }}</td><td>{{ submission.submitted_at|date:"j M Y, H:i" }}</td><td>{% if submission.portal_submission %}{{ submission.portal_submission.review_status_display }}{% else %}Submitted{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="text-body-secondary">No progress submissions match these filters.</td></tr>{% endfor %}
+        </tbody>
+      {% endif %}
+    </table></div>
+    {% if progress_page.has_other_pages %}
+      <nav aria-label="Progress pages"><ul class="pagination mb-0">
+        {% if progress_page.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ progress_page.previous_page_number }}&amp;business={{ request.GET.business|urlencode }}&amp;programme={{ request.GET.programme|urlencode }}&amp;cohort={{ request.GET.cohort|urlencode }}&amp;status={{ request.GET.status|urlencode }}&amp;reporting_period={{ request.GET.reporting_period|urlencode }}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ progress_page.number }} of {{ progress_page.paginator.num_pages }}</span></li>
+        {% if progress_page.has_next %}<li class="page-item"><a class="page-link" href="?page={{ progress_page.next_page_number }}&amp;business={{ request.GET.business|urlencode }}&amp;programme={{ request.GET.programme|urlencode }}&amp;cohort={{ request.GET.cohort|urlencode }}&amp;status={{ request.GET.status|urlencode }}&amp;reporting_period={{ request.GET.reporting_period|urlencode }}">Next</a></li>{% endif %}
+      </ul></nav>
+    {% endif %}
+  </div></section>
+</main>
+{% endblock %}

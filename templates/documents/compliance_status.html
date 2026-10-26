@@ -11,9 +11,6 @@
     <div class="col-6 col-xl-3"><div class="card border-danger"><div class="card-body"><div class="text-body-secondary">Expired</div><div class="display-6">{{ status_counts.expired }}</div></div></div></div>
     <div class="col-6 col-xl-3"><div class="card border-secondary"><div class="card-body"><div class="text-body-secondary">No expiry date</div><div class="display-6">{{ status_counts.no_expiry }}</div></div></div></div>
   </div>
-  {% if not missing_categories_configured %}
-    <div class="alert alert-info">Missing-document rules are not configured because the SRS does not identify which categories are required. See open decision OD-06.</div>
-  {% endif %}
   <div class="table-responsive"><table class="table table-hover bg-white">
     <thead><tr><th>Document</th><th>Category</th><th>Expiry date</th><th>Status</th></tr></thead>
     <tbody>{% for document in documents %}

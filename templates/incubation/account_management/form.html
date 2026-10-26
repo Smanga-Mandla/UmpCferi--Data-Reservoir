@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<section class="container py-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-body p-4">
+          <h1 class="h3">{{ title }}</h1>
+          <p class="text-body-secondary">This creates an account only and links it to existing business record(s). It does not create or duplicate SME records.</p>
+          {% if not has_manageable_businesses %}
+            <div class="alert alert-warning" role="status">
+              You cannot register an invitation yet because no businesses are assigned to your authorized scope. Ask an administrator to assign the existing business to you first.
+            </div>
+          {% endif %}
+          <div class="alert alert-info">The account will receive a secure password-setup link that expires after 30 minutes. No password is sent by email. Contact number is omitted pending CFERI approval.</div>
+          <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            {% endfor %}
+            {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+            <button class="btn btn-primary" type="submit">Create account and send invitation</button>
+            <a class="btn btn-outline-secondary" href="{% url 'incubation:account_list' %}">Cancel</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

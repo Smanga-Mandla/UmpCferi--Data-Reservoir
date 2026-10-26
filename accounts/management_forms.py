@@ -27,7 +27,7 @@ class UserInvitationForm(forms.Form):
     def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.actor = actor
-        roles = Role.objects.order_by("code")
+        roles = Role.objects.exclude(code=Role.Code.INCUBATEE).order_by("code")
         if actor is not None and not _may_assign_super_admin(actor):
             roles = roles.exclude(code=Role.Code.SUPER_ADMIN)
         self.fields["roles"].queryset = roles
@@ -80,7 +80,7 @@ class UserAccessForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.target_user = target_user
         self.actor = actor
-        roles = Role.objects.order_by("code")
+        roles = Role.objects.exclude(code=Role.Code.INCUBATEE).order_by("code")
         if actor is not None and not _may_assign_super_admin(actor):
             roles = roles.exclude(code=Role.Code.SUPER_ADMIN)
         self.fields["roles"].queryset = roles

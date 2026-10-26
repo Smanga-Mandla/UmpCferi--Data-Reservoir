@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} | My Business Documents{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <p><a href="{% url 'incubation:business_document_list' business.pk %}">My Business Documents</a></p>
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+    <div><h1 class="h2">{{ document.title }}</h1><p class="text-body-secondary">{{ document.get_category_display }} · {{ business.legal_name }}</p></div>
+    {% if can_upload %}<a class="btn btn-outline-primary" href="{% url 'incubation:business_document_replace' business.pk document.pk %}">Upload new version</a>{% endif %}
+  </div>
+  <dl class="row">
+    <dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ document.description|default:"—"|linebreaksbr }}</dd>
+    <dt class="col-sm-3">Expiry date</dt><dd class="col-sm-9">{{ document.expiry_date|date:"j F Y"|default:"Not applicable" }}</dd>
+    <dt class="col-sm-3">Status</dt><dd class="col-sm-9">{{ document.display_status }}</dd>
+    {% if document.review_note %}<dt class="col-sm-3">Review note</dt><dd class="col-sm-9">{{ document.review_note }}</dd>{% endif %}
+  </dl>
+  {% if is_reviewer and document.status == "pending" %}
+    <form method="post" action="{% url 'incubation:business_document_review' business.pk document.pk %}" class="card card-body mb-4">
+      {% csrf_token %}
+      <label class="form-label" for="review-note">Review note</label>
+      <textarea id="review-note" name="review_note" class="form-control mb-3" rows="2"></textarea>
+      <div class="d-flex gap-2">
+        <button class="btn btn-success" name="decision" value="approve">Approve</button>
+        <button class="btn btn-outline-danger" name="decision" value="reject">Reject</button>
+      </div>
+    </form>
+  {% endif %}
+  <section class="card">
+    <div class="card-body">
+      <h2 class="h5">Version history</h2>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Version</th><th>Uploaded</th><th>Uploaded by</th><th>File</th><th>Change note</th><th>Metadata at upload</th></tr></thead>
+          <tbody>
+            {% for version in document.versions.all %}
+              <tr>
+                <td>v{{ version.version_number }}{% if version.is_current %} (current){% endif %}</td>
+                <td>{{ version.uploaded_at|date:"j M Y H:i" }}</td>
+                <td>{{ version.uploaded_by.get_full_name|default:version.uploaded_by.email }}</td>
+                <td><a href="{% url 'incubation:business_document_version_download' business.pk document.pk version.pk %}">{{ version.original_filename }}</a></td>
+                <td>{{ version.change_note|default:"—" }}</td>
+                <td>
+                  <details>
+                    <summary>View</summary>
+                    <dl class="small mb-0 mt-2">
+                      <dt>Title</dt><dd>{{ version.metadata_snapshot.title|default:"—" }}</dd>
+                      <dt>Category</dt><dd>{{ version.metadata_snapshot.category|default:"—" }}</dd>
+                      <dt>Description</dt><dd>{{ version.metadata_snapshot.description|default:"—" }}</dd>
+                      <dt>Expiry date</dt><dd>{{ version.metadata_snapshot.expiry_date|default:"—" }}</dd>
+                      <dt>Review status at upload</dt><dd>{{ version.metadata_snapshot.status|default:"—" }}</dd>
+                    </dl>
+                  </details>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">No versions recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}

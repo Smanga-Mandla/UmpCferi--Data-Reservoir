@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Incubatee Profile | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div><p class="text-body-secondary mb-1">Staff account profile</p><h1 class="h2 mb-1">{{ account.user.get_full_name }}</h1><p class="mb-0">{{ account.user.email }}</p></div>
+    <a class="btn btn-outline-secondary" href="{% url 'incubation:account_list' %}">Back to incubatee accounts</a>
+  </div>
+  <div class="alert alert-info" role="note">This profile contains account and linked-business information only. Founder identity and restricted administrative records are not included.</div>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Account</h2>
+    <dl class="row mb-0">
+      <dt class="col-sm-3">Account status</dt><dd class="col-sm-9">{{ account.account_status }}</dd>
+      <dt class="col-sm-3">Invitation status</dt><dd class="col-sm-9">{{ account.invitation_status|title }}</dd>
+      <dt class="col-sm-3">Entrepreneur category</dt><dd class="col-sm-9">{{ account.get_entrepreneur_category_display }}</dd>
+      <dt class="col-sm-3">Created</dt><dd class="col-sm-9">{{ account.created_at|date:"j F Y, H:i" }} by {{ account.created_by.get_full_name|default:account.created_by.email }}</dd>
+    </dl>
+  </div></section>
+  {% for row in business_rows %}
+    <section class="card mb-4">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2"><h2 class="h5 mb-0">{{ row.business.legal_name }}</h2>{% if not row.limited_scope %}<span class="badge text-bg-primary">{{ row.business.get_status_display }}</span>{% endif %}</div>
+      <div class="card-body">
+        {% if row.limited_scope %}
+          <p class="text-body-secondary mb-0">This representative is linked to this business. Business details and activity are hidden because it is outside your assigned business scope.</p>
+        {% else %}
+        <dl class="row">
+          <dt class="col-sm-3">Trading name</dt><dd class="col-sm-9">{{ row.business.trading_name|default:"—" }}</dd>
+          <dt class="col-sm-3">Business contact</dt><dd class="col-sm-9">{{ row.business.business_contact_email|default:"—" }}{% if row.business.business_contact_number %} · {{ row.business.business_contact_number }}{% endif %}</dd>
+          <dt class="col-sm-3">Linked since</dt><dd class="col-sm-9">{% for link in account.business_links.all %}{% if link.incubatee_id == row.business.pk %}{{ link.linked_at|date:"j F Y" }}{% endif %}{% endfor %}</dd>
+        </dl>
+        <div class="row g-4">
+          <div class="col-12 col-xl-6"><h3 class="h6">Progress history</h3><ul class="list-group list-group-flush">
+            {% for checkin in row.progress %}<li class="list-group-item px-0 d-flex justify-content-between"><span>{{ checkin.period_start|date:"F Y" }}</span><span>{{ checkin.submitted_at|date:"j M Y" }}</span></li>{% empty %}<li class="list-group-item px-0 text-body-secondary">No submitted progress records.</li>{% endfor %}
+          </ul></div>
+          <div class="col-12 col-xl-6"><h3 class="h6">Uploaded business documents</h3><ul class="list-group list-group-flush">
+            {% for document in row.documents %}<li class="list-group-item px-0 d-flex justify-content-between"><span>{{ document.title }}</span><span>{{ document.get_status_display }}</span></li>{% empty %}<li class="list-group-item px-0 text-body-secondary">No business documents.</li>{% endfor %}
+          </ul></div>
+          <div class="col-12 col-xl-6"><h3 class="h6">Support requests</h3><ul class="list-group list-group-flush">
+            {% for request in row.support_requests %}<li class="list-group-item px-0"><div class="d-flex justify-content-between gap-2"><span>{{ request.get_category_display }}</span><span>{{ request.get_status_display }}</span></div><small class="text-body-secondary">{{ request.description|truncatewords:24 }}</small></li>{% empty %}<li class="list-group-item px-0 text-body-secondary">No support requests.</li>{% endfor %}
+          </ul></div>
+          <div class="col-12 col-xl-6"><h3 class="h6">Mentorship activities</h3><ul class="list-group list-group-flush">
+            {% for session in row.sessions %}<li class="list-group-item px-0 d-flex justify-content-between"><span>{{ session.mentor|default:"Mentor not recorded" }}</span><span>{{ session.session_date|date:"j M Y" }}</span></li>{% empty %}<li class="list-group-item px-0 text-body-secondary">No mentorship sessions.</li>{% endfor %}
+          </ul></div>
+          <div class="col-12"><h3 class="h6">Milestones</h3><ul class="list-group list-group-flush">
+            {% for milestone in row.milestones %}<li class="list-group-item px-0 d-flex justify-content-between"><span>{{ milestone.title|default:milestone.get_milestone_type_display }}</span><span>{{ milestone.milestone_date|date:"j M Y" }} · {{ milestone.review_status|title }}</span></li>{% empty %}<li class="list-group-item px-0 text-body-secondary">No milestones recorded.</li>{% endfor %}
+          </ul></div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  {% endfor %}
+</main>
+{% endblock %}

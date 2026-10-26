@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4" style="max-width: 760px">
+  <p><a href="{% url 'incubation:business_document_list' business.pk %}">My Business Documents</a></p>
+  <h1 class="h2">{{ title }}</h1>
+  <p class="text-body-secondary">{{ business.legal_name }} · Uploads must be PDF, DOCX, XLSX or a supported raster image and no larger than 25 MB.</p>
+  <form method="post" enctype="multipart/form-data" class="card">
+    {% csrf_token %}
+    <div class="card-body">
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit">Upload securely</button>
+    </div>
+  </form>
+</main>
+{% endblock %}

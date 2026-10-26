@@ -22,6 +22,8 @@ from documents.models import Document, ExpiryAlert
 from documents.services import accessible_documents
 from incubation.access import is_aggregate_only
 from incubation.metrics import data_completeness
+from incubation.account_access import can_manage_incubatee_accounts
+from incubation.dashboard_views import incubatee_dashboard
 from incubation.models import Incubatee, MonthlyCheckIn
 from interactions.models import Interaction
 from partners.models import MOU, MOUExpiryAlert, Partner
@@ -48,13 +50,16 @@ def _role_context(request):
         "can_view_reports": has_access(
             user, RoleGrant.Resource.REPORTS, RoleGrant.Action.READ
         ),
+        "can_manage_incubatee_accounts": can_manage_incubatee_accounts(user),
     }
 
 
 class DashboardIndexView(LoginRequiredMixin, View):
     def get(self, request):
         roles = Role.objects.filter(users=request.user).order_by("code")
-        if request.user.is_superuser:
+        if roles.filter(code=Role.Code.INCUBATEE).exists():
+            role = Role.objects.get(code=Role.Code.INCUBATEE)
+        elif request.user.is_superuser:
             role = Role.objects.get(code=Role.Code.SUPER_ADMIN)
         else:
             role = roles.first()
@@ -68,7 +73,10 @@ class RoleDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     def test_func(self):
         user = self.request.user
-        return user.is_superuser or user.roles.filter(code=self.role_code).exists()
+        is_incubatee = user.roles.filter(code=Role.Code.INCUBATEE).exists()
+        return not is_incubatee and (
+            user.is_superuser or user.roles.filter(code=self.role_code).exists()
+        )
 
     def handle_no_permission(self):
         if not self.request.user.is_authenticated:
@@ -87,6 +95,8 @@ def _render_role_dashboard(request, role):
         "role": role,
         "system_health_only": False,
     }
+    if role.code == Role.Code.INCUBATEE:
+        return incubatee_dashboard(request)
     if not has_access(
         request.user, RoleGrant.Resource.REPORTS, RoleGrant.Action.READ
     ):

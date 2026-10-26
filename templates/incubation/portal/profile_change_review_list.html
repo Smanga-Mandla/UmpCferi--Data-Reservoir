@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Profile Change Review | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <h1 class="h2">Incubatee Profile Change Review</h1>
+  <p class="text-body-secondary">Requests are restricted to businesses within your authorized CFERI management scope.</p>
+  {% for change in changes %}
+    <article class="card mb-3">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+          <h2 class="h5">{{ change.incubatee.legal_name }}</h2>
+          <span>{{ change.get_status_display }}</span>
+        </div>
+        <p class="small text-body-secondary">Requested by {{ change.requested_by.get_full_name|default:change.requested_by.email }} · {{ change.created_at|date:"j M Y H:i" }}</p>
+        <p>{{ change.request_note }}</p>
+        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Field</th><th>Current value at request</th><th>Proposed value</th></tr></thead><tbody>
+          {% for field, value in change.proposed_values.items %}
+            <tr><th>{{ field|title }}</th><td>{% for old_field, old_value in change.old_values.items %}{% if old_field == field %}{{ old_value|default:"—" }}{% endif %}{% endfor %}</td><td>{{ value|default:"—" }}</td></tr>
+          {% endfor %}
+        </tbody></table></div>
+        {% if change.status == "pending" %}
+          <form method="post" action="{% url 'incubation:profile_change_review' change.pk %}">
+            {% csrf_token %}
+            <label class="form-label" for="note-{{ change.pk }}">Review note</label>
+            <textarea class="form-control mb-2" id="note-{{ change.pk }}" name="review_note" rows="2"></textarea>
+            <button class="btn btn-success" name="decision" value="approve">Approve</button>
+            <button class="btn btn-outline-danger" name="decision" value="reject">Reject</button>
+          </form>
+        {% elif change.review_note %}
+          <p class="mb-0"><strong>Review note:</strong> {{ change.review_note }}</p>
+        {% endif %}
+      </div>
+    </article>
+  {% empty %}
+    <div class="alert alert-info">No profile change requests are available for review.</div>
+  {% endfor %}
+</main>
+{% endblock %}

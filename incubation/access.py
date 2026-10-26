@@ -6,9 +6,10 @@ PERSONAL_DATA_ROLES = {Role.Code.SUPER_ADMIN, Role.Code.ADMIN}
 
 
 def role_codes(user):
-    if user.is_superuser:
-        return {Role.Code.SUPER_ADMIN}
-    return set(user.roles.values_list("code", flat=True))
+    roles = set(user.roles.values_list("code", flat=True))
+    if Role.Code.INCUBATEE in roles:
+        return {Role.Code.INCUBATEE}
+    return {Role.Code.SUPER_ADMIN} if user.is_superuser else roles
 
 
 def can_view_founder_data(user, incubatee):

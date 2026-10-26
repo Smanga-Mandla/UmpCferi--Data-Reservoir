@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Notifications | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <h1 class="h2">Notification Centre</h1>
+  <p class="text-body-secondary">{{ business.legal_name }} · {{ unread_count }} unread</p>
+  <section class="card"><div class="card-body">
+    <ul class="list-group list-group-flush">
+      {% for notification in notifications %}
+        <li class="list-group-item px-0 {% if not notification.read %}fw-semibold{% endif %}">
+          <div class="d-flex flex-wrap justify-content-between gap-2">
+            <div>
+              <span class="badge text-bg-light">{{ notification.type }}</span>
+              <strong>{{ notification.title }}</strong>
+              {% if notification.message %}<p class="mb-1 mt-1 fw-normal">{{ notification.message }}</p>{% endif %}
+              <small class="text-body-secondary fw-normal">{{ notification.date|date:"j M Y" }}</small>
+              {% if notification.id and notification.email_error %}<p class="small text-warning-emphasis fw-normal mb-0">Email delivery failed; this notification is available in the portal.</p>{% endif %}
+            </div>
+            {% if notification.id and not notification.read %}
+              <form method="post" action="{% url 'incubation:notification_mark_read' business.pk notification.id %}">
+                {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" type="submit">Mark as read</button>
+              </form>
+            {% endif %}
+          </div>
+        </li>
+      {% empty %}<li class="list-group-item px-0 text-body-secondary">You have no notifications for this business.</li>{% endfor %}
+    </ul>
+  </div></section>
+</main>
+{% endblock %}

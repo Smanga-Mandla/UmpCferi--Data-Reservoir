@@ -1,10 +1,199 @@
 from django.urls import path
 
 from incubation import views
+from incubation import account_views
+from incubation import dashboard_views
+from incubation import portal_views
+from incubation import progress_views
+from incubation import report_views
+from incubation import support_portal_views
 
 app_name = "incubation"
 
 urlpatterns = [
+    path("my-dashboard/", dashboard_views.incubatee_dashboard, name="incubatee_dashboard"),
+    path(
+        "my/<uuid:incubatee_id>/reports/",
+        report_views.incubatee_reports,
+        name="incubatee_reports",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/reports/export/<str:format_name>/",
+        report_views.incubatee_report_export,
+        name="incubatee_report_export",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-profile/",
+        portal_views.business_profile,
+        name="business_profile",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/",
+        portal_views.business_document_list,
+        name="business_document_list",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/upload/",
+        portal_views.business_document_upload,
+        name="business_document_upload",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/<uuid:document_id>/",
+        portal_views.business_document_detail,
+        name="business_document_detail",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/<uuid:document_id>/replace/",
+        portal_views.business_document_upload,
+        name="business_document_replace",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/<uuid:document_id>/download/",
+        portal_views.business_document_download,
+        name="business_document_download",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-documents/<uuid:document_id>/versions/<uuid:version_id>/download/",
+        portal_views.business_document_download,
+        name="business_document_version_download",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/monthly-progress/",
+        progress_views.progress_history,
+        name="progress_history",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/monthly-progress/submit/",
+        progress_views.progress_submit,
+        name="progress_submit",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/milestones/",
+        progress_views.milestone_list,
+        name="milestone_list",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/milestones/submit/",
+        progress_views.milestone_submit,
+        name="milestone_submit",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/challenges/",
+        progress_views.challenge_list,
+        name="challenge_list",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/challenges/submit/",
+        progress_views.challenge_submit,
+        name="challenge_submit",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/support-requests/",
+        support_portal_views.support_request_list,
+        name="support_request_list",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/support-requests/submit/",
+        support_portal_views.support_request_submit,
+        name="support_request_submit",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/support-requests/<int:request_id>/evidence/",
+        support_portal_views.support_request_evidence_download,
+        name="support_request_evidence_download",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/mentorship/",
+        support_portal_views.mentorship_portal,
+        name="mentorship_portal",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/notifications/",
+        support_portal_views.notification_centre,
+        name="notification_centre",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/notifications/<int:notification_id>/read/",
+        support_portal_views.notification_mark_read,
+        name="notification_mark_read",
+    ),
+    path(
+        "review/support-requests/",
+        support_portal_views.support_request_review_list,
+        name="support_request_review_list",
+    ),
+    path(
+        "review/support-requests/<int:request_id>/",
+        support_portal_views.support_request_review,
+        name="support_request_review",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/evidence/<str:kind>/<int:record_id>/download/",
+        progress_views.progress_evidence_download,
+        name="progress_evidence_download",
+    ),
+    path(
+        "review/progress/",
+        progress_views.progress_review_list,
+        name="progress_review_list",
+    ),
+    path(
+        "review/progress/<str:kind>/<int:record_id>/",
+        progress_views.progress_review,
+        name="progress_review",
+    ),
+    path(
+        "review/profile-changes/",
+        portal_views.profile_change_review_list,
+        name="profile_change_review_list",
+    ),
+    path(
+        "review/profile-changes/<int:change_id>/",
+        portal_views.profile_change_review,
+        name="profile_change_review",
+    ),
+    path(
+        "review/business-documents/",
+        portal_views.business_document_review_list,
+        name="business_document_review_list",
+    ),
+    path(
+        "review/business-documents/<uuid:incubatee_id>/<uuid:document_id>/",
+        portal_views.business_document_review,
+        name="business_document_review",
+    ),
+    path("accounts/", account_views.incubatee_account_list, name="account_list"),
+    path("accounts/add/", account_views.incubatee_account_create, name="account_create"),
+    path(
+        "accounts/<int:account_id>/resend-invitation/",
+        account_views.resend_incubatee_invitation,
+        name="account_resend_invitation",
+    ),
+    path(
+        "accounts/<int:account_id>/status/",
+        account_views.set_incubatee_account_status,
+        name="account_status",
+    ),
+    path(
+        "accounts/<int:account_id>/profile/",
+        report_views.incubatee_account_profile,
+        name="account_profile",
+    ),
+    path(
+        "staff/monitoring/",
+        report_views.staff_incubatee_monitoring,
+        name="staff_incubatee_monitoring",
+    ),
+    path(
+        "staff/monitoring/outstanding-progress/",
+        report_views.staff_outstanding_progress,
+        name="staff_outstanding_progress",
+    ),
+    path(
+        "staff/monitoring/recent-progress/",
+        report_views.staff_recent_progress,
+        name="staff_recent_progress",
+    ),
     path("", views.incubatee_list, name="list"),
     path("add/", views.incubatee_create, name="create"),
     path("import/", views.incubatee_import, name="import"),

@@ -51,7 +51,12 @@ class ProjectConfigurationTests(SimpleTestCase):
             "django.contrib.auth.hashers.Argon2PasswordHasher",
         )
         self.assertEqual(settings.PASSWORD_RESET_TIMEOUT, 1800)
-        self.assertEqual(settings.SESSION_COOKIE_AGE, 1800)
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 1209600)
+        self.assertNotIn(
+            "accounts.middleware.InactivityTimeoutMiddleware",
+            settings.MIDDLEWARE,
+        )
+        self.assertEqual(settings.LOGOUT_REDIRECT_URL, "accounts:login")
 
     def test_private_media_is_separate_from_static_files(self):
         self.assertNotEqual(settings.PRIVATE_MEDIA_ROOT, settings.STATIC_ROOT)
@@ -78,13 +83,9 @@ class ProjectConfigurationTests(SimpleTestCase):
             "https://reservoir.example.test",
         )
 
-    def test_landing_page_and_login_page_render(self):
+    def test_root_redirects_to_login_and_login_page_renders(self):
         home = self.client.get(reverse("home"))
-        self.assertEqual(home.status_code, 200)
-        self.assertContains(home, "University of Mpumalanga")
-        self.assertContains(home, "CFERI")
-        self.assertContains(home, "images/ump-crest.png")
-        self.assertContains(home, "nav-signin-btn")
+        self.assertRedirects(home, reverse("accounts:login"))
         response = self.client.get(reverse("accounts:login"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Email address")

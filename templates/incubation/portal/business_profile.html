@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}My Business Profile | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <p><a href="{% url 'incubation:incubatee_dashboard' %}">My dashboard</a></p>
+  <div class="d-flex flex-wrap justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2">My Business Profile</h1>
+      <p class="text-body-secondary mb-0">{{ business.legal_name }}</p>
+    </div>
+    <a class="btn btn-outline-primary align-self-start" href="{% url 'incubation:business_document_list' business.pk %}">My Business Documents</a>
+  </div>
+
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Current business information</h2>
+      <dl class="row mb-0">
+        <dt class="col-sm-4">Legal business name</dt><dd class="col-sm-8">{{ business.legal_name }}</dd>
+        <dt class="col-sm-4">Trading name</dt><dd class="col-sm-8">{{ business.trading_name|default:"—" }}</dd>
+        <dt class="col-sm-4">CIPC registration number</dt><dd class="col-sm-8">{{ business.cipc_registration_number|default:"—" }}</dd>
+        <dt class="col-sm-4">Entity type</dt><dd class="col-sm-8">{{ business.get_entity_type_display|default:"—" }}</dd>
+        <dt class="col-sm-4">Business sector / SIC code</dt><dd class="col-sm-8">{{ business.sic_code|default:"—" }}</dd>
+        <dt class="col-sm-4">Sub-sector</dt><dd class="col-sm-8">{{ business.sub_sector|default:"—" }}</dd>
+        <dt class="col-sm-4">Products and services</dt><dd class="col-sm-8">{{ business.products_services|default:"—"|linebreaksbr }}</dd>
+        <dt class="col-sm-4">Business model</dt><dd class="col-sm-8">{{ business.get_business_model_display|default:"—" }}</dd>
+        <dt class="col-sm-4">Business stage</dt><dd class="col-sm-8">{{ business.get_business_stage_display|default:"—" }}</dd>
+        <dt class="col-sm-4">Physical address</dt><dd class="col-sm-8">{{ business.physical_address|default:"—"|linebreaksbr }}</dd>
+        <dt class="col-sm-4">Province</dt><dd class="col-sm-8">{{ business.province|default:"—" }}</dd>
+        <dt class="col-sm-4">Municipality</dt><dd class="col-sm-8">{{ business.municipality|default:"—" }}</dd>
+        <dt class="col-sm-4">Business contact email</dt><dd class="col-sm-8">{{ business.business_contact_email|default:"—" }}</dd>
+        <dt class="col-sm-4">Business contact number</dt><dd class="col-sm-8">{{ business.business_contact_number|default:"—" }}</dd>
+      </dl>
+    </div>
+  </section>
+
+  {% if is_incubatee %}
+    <section class="card mb-4">
+      <div class="card-body">
+        <h2 class="h5">Update approved profile fields</h2>
+        <p class="text-body-secondary">These changes update your business profile directly and are recorded in the audit history.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="approved_fields">
+          {{ profile_form.non_field_errors }}
+          <div class="row g-3">
+            {% for field in profile_form %}
+              <div class="col-12 {% if field.name == 'products_services' or field.name == 'physical_address' %}col-lg-6{% else %}col-md-6{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Save profile changes</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card mb-4">
+      <div class="card-body">
+        <h2 class="h5">Request a change to verified information</h2>
+        <p class="text-body-secondary">Legal name, registration number, entity type, and registration date are protected. They remain unchanged unless CFERI approves your proposal.</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="form_type" value="protected_fields">
+          {{ protected_form.non_field_errors }}
+          <div class="row g-3">
+            {% for field in protected_form %}
+              <div class="col-12 col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors|join:", " }}</div>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-outline-primary mt-3" type="submit">Submit for CFERI review</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="card-body">
+      <h2 class="h5">Protected-field change history</h2>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Submitted</th><th>Proposed fields</th><th>Status</th><th>Review note</th></tr></thead>
+          <tbody>
+            {% for change in change_requests %}
+              <tr>
+                <td>{{ change.created_at|date:"j M Y H:i" }}</td>
+                <td>{{ change.proposed_values.keys|join:", " }}</td>
+                <td>{{ change.get_status_display }}</td>
+                <td>{{ change.review_note|default:"—" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-body-secondary">No change requests submitted.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}

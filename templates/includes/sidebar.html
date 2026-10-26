@@ -1,27 +1,58 @@
 <aside class="dashboard-sidebar">
   <nav class="list-group list-group-flush" id="workspaceSidebar" aria-label="Workspace navigation">
-    <a class="list-group-item list-group-item-action" href="{% url 'reporting:dashboard' %}">Dashboard</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'documents:list' %}">Centre documents</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'documents:compliance' %}">Compliance status</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'documents:alerts' %}">Expiry alerts</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'partners:partner_list' %}">Partners</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_list' %}">MOUs</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_expiry_alerts' %}">MOU renewal alerts</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'stakeholders:list' %}">Stakeholders</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'incubation:list' %}">Incubatees</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'incubation:checkin_list' %}">Monthly check-ins</a>
-    <a class="list-group-item list-group-item-action" href="{% url 'interactions:list' %}">Interactions</a>
-    {% if can_view_reports %}
-      <a class="list-group-item list-group-item-action" href="{% url 'reporting:impact' %}">Impact report</a>
+    {% if is_incubatee_user %}
+      <a class="list-group-item list-group-item-action" href="{% url 'incubation:incubatee_dashboard' %}">My dashboard</a>
+      {% if business %}
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:business_profile' business.pk %}">My Business Profile</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:business_document_list' business.pk %}">Business Documents</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:progress_history' business.pk %}">Monthly Progress</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:milestone_list' business.pk %}">Business Milestones</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:challenge_list' business.pk %}">Challenges</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:support_request_list' business.pk %}">Support Requests</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:mentorship_portal' business.pk %}">My Mentorship</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:notification_centre' business.pk %}">Notifications</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:incubatee_reports' business.pk %}">Business Performance &amp; Reports</a>
+      {% endif %}
+    {% else %}
+      <a class="list-group-item list-group-item-action" href="{% url 'reporting:dashboard' %}">Dashboard</a>
     {% endif %}
-    {% if can_view_audit_log %}
-      <a class="list-group-item list-group-item-action" href="{% url 'reporting:audit_log' %}">Audit log</a>
-    {% endif %}
-    {% if can_manage_users %}
-      <a class="list-group-item list-group-item-action" href="{% url 'accounts:manage_users' %}">Manage accounts</a>
-    {% endif %}
-    {% if can_manage_role_matrix %}
-      <a class="list-group-item list-group-item-action" href="{% url 'accounts:role_matrix' %}">Role permissions</a>
+    {% if not is_incubatee_user %}
+      <a class="list-group-item list-group-item-action" href="{% url 'documents:list' %}">Centre documents</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'documents:compliance' %}">Compliance status</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'documents:alerts' %}">Expiry alerts</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'partners:partner_list' %}">Partners</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_list' %}">MOUs</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'partners:mou_expiry_alerts' %}">MOU renewal alerts</a>
+      {% if not is_cferi_staff %}
+        <a class="list-group-item list-group-item-action" href="{% url 'stakeholders:list' %}">Stakeholders</a>
+      {% endif %}
+      <a class="list-group-item list-group-item-action" href="{% url 'incubation:list' %}">Incubatees</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'incubation:checkin_list' %}">Monthly check-ins</a>
+      <a class="list-group-item list-group-item-action" href="{% url 'interactions:list' %}">Interactions</a>
+      {% if can_view_reports %}
+        <a class="list-group-item list-group-item-action" href="{% url 'reporting:impact' %}">Reports</a>
+      {% endif %}
+      {% if can_view_audit_log %}
+        <a class="list-group-item list-group-item-action" href="{% url 'reporting:audit_log' %}">Audit log</a>
+      {% endif %}
+      {% if can_manage_users %}
+        <a class="list-group-item list-group-item-action" href="{% url 'accounts:manage_users' %}">Manage accounts</a>
+      {% endif %}
+      {% if can_manage_incubatee_accounts %}
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:account_list' %}">Manage Incubatees</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:profile_change_review_list' %}">Business profile reviews</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:business_document_review_list' %}">Business document reviews</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:progress_review_list' %}">Progress, milestone and challenge reviews</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:support_request_review_list' %}">Support request reviews</a>
+      {% endif %}
+      {% if is_cferi_staff %}
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:staff_outstanding_progress' %}">Outstanding progress submissions</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:staff_recent_progress' %}">Recently submitted progress</a>
+      {% endif %}
+      {% if can_manage_role_matrix %}
+        <a class="list-group-item list-group-item-action" href="{% url 'accounts:role_matrix' %}">Role permissions</a>
+      {% endif %}
     {% endif %}
   </nav>
 </aside>

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Monthly Progress | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+    <div><h1 class="h2">Monthly Progress</h1><p class="text-body-secondary mb-0">{{ business.legal_name }}</p></div>
+    <a class="btn btn-primary" href="{% url 'incubation:progress_submit' business.pk %}">Submit monthly update</a>
+  </div>
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Business performance trends</h2>
+      {% if chart_labels %}
+        <div class="table-responsive"><canvas id="progress-chart" aria-label="Monthly revenue, customers and employment trend" role="img"></canvas></div>
+        {{ chart_labels|json_script:"chart-labels" }}
+        {{ revenue_values|json_script:"revenue-values" }}
+        {{ customer_values|json_script:"customer-values" }}
+        {{ full_time_values|json_script:"full-time-values" }}
+        {{ part_time_values|json_script:"part-time-values" }}
+      {% else %}
+        <p class="text-body-secondary mb-0">Performance trends will appear after monthly observations are recorded.</p>
+      {% endif %}
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-body">
+      <h2 class="h5">Submission history</h2>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead><tr><th>Reporting period</th><th>Revenue</th><th>Customers</th><th>Employment</th><th>Funding this period</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for submission in submissions %}
+              {% with metrics=submission.metric_values %}
+                <tr>
+                  <td>{{ submission.checkin.period_start|date:"F Y" }}</td>
+                  <td>R {{ metrics.revenue_zar|floatformat:2 }}</td>
+                  <td>{{ metrics.customer_count|default:"0" }}</td>
+                  <td>FT {{ metrics.full_time_employees|default:"0" }} / PT {{ metrics.part_time_employees|default:"0" }}</td>
+                  <td>R {{ metrics.funding_received_zar|floatformat:2 }}</td>
+                  <td>{{ submission.review_status_display }}</td>
+                </tr>
+                {% if submission.business_achievements or submission.challenges_experienced or submission.additional_comments %}
+                  <tr><td colspan="6" class="bg-body-tertiary">
+                    {% if submission.business_achievements %}<p class="mb-1"><strong>Achievements:</strong> {{ submission.business_achievements }}</p>{% endif %}
+                    {% if submission.challenges_experienced %}<p class="mb-1"><strong>Challenges:</strong> {{ submission.challenges_experienced }}</p>{% endif %}
+                    {% if submission.additional_comments %}<p class="mb-1"><strong>Comments:</strong> {{ submission.additional_comments }}</p>{% endif %}
+                    {% if submission.review_note %}<p class="mb-0"><strong>CFERI review:</strong> {{ submission.review_note }}</p>{% endif %}
+                  </td></tr>
+                {% endif %}
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block extra_scripts %}
+{% if chart_labels %}
+<script>
+  const progressLabels = JSON.parse(document.getElementById("chart-labels").textContent);
+  const values = (id) => JSON.parse(document.getElementById(id).textContent);
+  new Chart(document.getElementById("progress-chart"), {
+    type: "line",
+    data: {
+      labels: progressLabels,
+      datasets: [
+        { label: "Revenue (ZAR)", data: values("revenue-values"), yAxisID: "money", borderColor: "#126b53", tension: 0.25 },
+        { label: "Customers", data: values("customer-values"), yAxisID: "count", borderColor: "#e28b2c", tension: 0.25 },
+        { label: "Full-time employees", data: values("full-time-values"), yAxisID: "count", borderColor: "#325f9b", tension: 0.25 },
+        { label: "Part-time employees", data: values("part-time-values"), yAxisID: "count", borderColor: "#8b5ca6", tension: 0.25 }
+      ]
+    },
+    options: { responsive: true, interaction: { mode: "index", intersect: false }, scales: { money: { type: "linear", position: "left", beginAtZero: true }, count: { type: "linear", position: "right", beginAtZero: true, grid: { drawOnChartArea: false } } } }
+  });
+</script>
+{% endif %}
+{% endblock %}

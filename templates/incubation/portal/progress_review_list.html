@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Progress Reviews | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <h1 class="h2">Progress, Milestone and Challenge Reviews</h1>
+  <p class="text-body-secondary">Review only businesses within your authorized CFERI scope. Each action is retained in the audit history.</p>
+  <section class="card mb-4"><div class="card-body"><h2 class="h5">Monthly progress submissions</h2>
+    {% for submission in submissions %}
+      <article class="border rounded p-3 mb-3">
+        <h3 class="h6">{{ submission.checkin.incubatee.legal_name }} · {{ submission.checkin.period_start|date:"F Y" }}</h3>
+        <p class="mb-2">Submitted by {{ submission.submitted_by.get_full_name|default:submission.submitted_by.email }} on {{ submission.submitted_at|date:"j M Y H:i" }} · Current: {{ submission.review_status }}</p>
+        <p class="small">Revenue: R {{ submission.metric_values.revenue_zar|floatformat:2 }} · Customers: {{ submission.metric_values.customer_count|default:"0" }} · Full-time: {{ submission.metric_values.full_time_employees|default:"0" }} · Part-time: {{ submission.metric_values.part_time_employees|default:"0" }} · Funding this period: R {{ submission.metric_values.funding_received_zar|floatformat:2 }}</p>
+        <p class="small">Employment breakdown — FT men/women/youth: {{ submission.metric_values.full_time_men|default:"0" }}/{{ submission.metric_values.full_time_women|default:"0" }}/{{ submission.metric_values.full_time_youth|default:"0" }}; PT men/women/youth: {{ submission.metric_values.part_time_men|default:"0" }}/{{ submission.metric_values.part_time_women|default:"0" }}/{{ submission.metric_values.part_time_youth|default:"0" }}</p>
+        {% if submission.business_achievements %}<p><strong>Achievements:</strong> {{ submission.business_achievements }}</p>{% endif %}
+        {% if submission.challenges_experienced %}<p><strong>Challenges:</strong> {{ submission.challenges_experienced }}</p>{% endif %}
+        <form method="post" action="{% url 'incubation:progress_review' 'progress' submission.pk %}" class="row g-2">
+          {% csrf_token %}<div class="col-md-3"><label class="form-label">Decision</label><select class="form-select" name="status">{% for value,label in progress_review_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+          <div class="col-md-7"><label class="form-label">Review note</label><input class="form-control" name="review_note" maxlength="2000"></div>
+          <div class="col-md-2 align-self-end"><button class="btn btn-primary" type="submit">Record review</button></div>
+        </form>
+        {% for review in submission.reviews.all %}<p class="small text-body-secondary mt-2 mb-0">{{ review.get_status_display }} by {{ review.reviewed_by.get_full_name|default:review.reviewed_by.email }} on {{ review.reviewed_at|date:"j M Y H:i" }}{% if review.review_note %}: {{ review.review_note }}{% endif %}</p>{% endfor %}
+      </article>
+    {% empty %}<p class="text-body-secondary">No monthly progress submissions.</p>{% endfor %}
+  </div></section>
+  <section class="card mb-4"><div class="card-body"><h2 class="h5">Milestones</h2>
+    {% for milestone in milestones %}
+      <article class="border rounded p-3 mb-3"><h3 class="h6">{{ milestone.incubatee.legal_name }} · {{ milestone.title|default:milestone.get_milestone_type_display }}</h3>
+        <p>{{ milestone.description|default:"No description provided." }} · {{ milestone.milestone_date|date:"j M Y" }}</p>
+        {% if milestone.evidence %}<a href="{% url 'incubation:progress_evidence_download' milestone.incubatee_id 'milestone' milestone.pk %}">View private evidence</a>{% endif %}
+        <form method="post" action="{% url 'incubation:progress_review' 'milestone' milestone.pk %}" class="row g-2 mt-1">{% csrf_token %}
+          <div class="col-md-3"><select class="form-select" name="status">{% for value,label in milestone_review_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+          <div class="col-md-7"><input class="form-control" name="review_note" maxlength="2000" aria-label="Milestone review note"></div>
+          <div class="col-md-2"><button class="btn btn-primary" type="submit">Record review</button></div>
+        </form>
+        {% for review in milestone.reviews.all %}<p class="small text-body-secondary mb-0 mt-2">{{ review.get_status_display }} · {{ review.reviewed_at|date:"j M Y H:i" }}{% if review.review_note %}: {{ review.review_note }}{% endif %}</p>{% endfor %}
+      </article>
+    {% empty %}<p class="text-body-secondary">No milestones recorded.</p>{% endfor %}
+  </div></section>
+  <section class="card"><div class="card-body"><h2 class="h5">Challenges</h2>
+    {% for challenge in challenges %}
+      <article class="border rounded p-3 mb-3"><h3 class="h6">{{ challenge.incubatee.legal_name }} · {{ challenge.get_category_display }}</h3><p>{{ challenge.description }}</p>
+        {% if challenge.evidence %}<a href="{% url 'incubation:progress_evidence_download' challenge.incubatee_id 'challenge' challenge.pk %}">View private evidence</a>{% endif %}
+        <form method="post" action="{% url 'incubation:progress_review' 'challenge' challenge.pk %}" class="row g-2 mt-1">{% csrf_token %}
+          <div class="col-md-3"><select class="form-select" name="status">{% for value,label in challenge_review_choices %}<option value="{{ value }}" {% if value == challenge.status %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+          <div class="col-md-7"><input class="form-control" name="review_note" maxlength="2000" aria-label="Challenge review note"></div>
+          <div class="col-md-2"><button class="btn btn-primary" type="submit">Record review</button></div>
+        </form>
+        {% for review in challenge.reviews.all %}<p class="small text-body-secondary mb-0 mt-2">{{ review.get_status_display }} · {{ review.reviewed_at|date:"j M Y H:i" }}{% if review.review_note %}: {{ review.review_note }}{% endif %}</p>{% endfor %}
+      </article>
+    {% empty %}<p class="text-body-secondary">No challenges reported.</p>{% endfor %}
+  </div></section>
+</main>
+{% endblock %}

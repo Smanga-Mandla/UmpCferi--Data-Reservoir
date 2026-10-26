@@ -10,12 +10,14 @@ from accounts.models import RecordShare, Role, RoleGrant
 SUPER_ADMIN = Role.Code.SUPER_ADMIN
 SYSTEM_ADMIN = Role.Code.SYSTEM_ADMIN
 BOARD_MEMBER = Role.Code.BOARD_MEMBER
+INCUBATEE = Role.Code.INCUBATEE
 
 
 def _role_codes(user):
-    if user.is_superuser:
-        return {SUPER_ADMIN}
-    return set(user.roles.values_list("code", flat=True))
+    roles = set(user.roles.values_list("code", flat=True))
+    if INCUBATEE in roles:
+        return {INCUBATEE}
+    return {SUPER_ADMIN} if user.is_superuser else roles
 
 
 def _is_expired(user):
@@ -76,6 +78,18 @@ def has_access(user, resource, action, record=None):
     roles = _role_codes(user)
     if not roles:
         return False
+    if roles == {INCUBATEE}:
+        if (
+            resource != RoleGrant.Resource.INCUBATEES
+            or action != RoleGrant.Action.READ
+            or record is None
+            or getattr(getattr(record, "_meta", None), "label_lower", None)
+            != "incubation.incubatee"
+            or getattr(record, "sensitivity", None)
+            in {"confidential", "restricted"}
+        ):
+            return False
+        return record.account_links.filter(account__user=user).exists()
 
     grants = RoleGrant.objects.filter(
         role__code__in=roles,
@@ -199,6 +213,16 @@ def accessible_queryset(user, resource, action, queryset):
     roles = _role_codes(user)
     if not roles:
         return queryset.none()
+    if roles == {INCUBATEE}:
+        if (
+            resource != RoleGrant.Resource.INCUBATEES
+            or action != RoleGrant.Action.READ
+            or queryset.model._meta.label_lower != "incubation.incubatee"
+        ):
+            return queryset.none()
+        return queryset.exclude(sensitivity="restricted").filter(
+            account_links__account__user=user
+        ).distinct()
 
     scopes = set(
         RoleGrant.objects.filter(

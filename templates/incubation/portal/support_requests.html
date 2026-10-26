@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Support Requests | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <h1 class="h2">Support Requests</h1>
+  <p class="text-body-secondary">{{ business.legal_name }}</p>
+  <section class="card mb-4"><div class="card-body">
+    <h2 class="h5">Request business support</h2>
+    <form method="post" enctype="multipart/form-data" action="{% url 'incubation:support_request_submit' business.pk %}" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="row g-3">
+        {% for field in form %}<div class="col-12 {% if field.name != 'description' and field.name != 'evidence' %}col-md-6{% endif %}">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>{% endfor %}
+      </div>
+      <button class="btn btn-primary mt-3" type="submit">Submit request</button>
+    </form>
+  </div></section>
+  <section class="card"><div class="card-body">
+    <h2 class="h5">My requests</h2>
+    {% for support_request in requests %}
+      <article class="border rounded p-3 mb-3">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+          <h3 class="h6">{{ support_request.get_category_display }}</h3>
+          <span class="badge text-bg-secondary">{{ support_request.get_status_display }}</span>
+        </div>
+        <p>{{ support_request.description }}</p>
+        <p class="small text-body-secondary mb-2">Submitted by {{ support_request.requested_by.get_full_name|default:support_request.requested_by.email }} on {{ support_request.submitted_at|date:"j M Y, H:i" }}{% if support_request.priority %} · Priority: {{ support_request.get_priority_display }}{% endif %}</p>
+        {% if support_request.evidence %}<p><a href="{% url 'incubation:support_request_evidence_download' business.pk support_request.pk %}">Download supporting document</a></p>{% endif %}
+        <h4 class="small fw-semibold">CFERI responses</h4>
+        <ul class="list-group list-group-flush">
+          {% for update in support_request.updates.all %}
+            <li class="list-group-item px-0">
+              {% if update.status %}<strong>{{ update.get_status_display }}</strong> · {% endif %}{{ update.created_at|date:"j M Y, H:i" }}
+              {% if update.response %}<p class="mb-0 mt-1">{{ update.response }}</p>{% endif %}
+              {% if update.assigned_to %}<small class="text-body-secondary">Assigned to {{ update.assigned_to.get_full_name|default:update.assigned_to.email }}</small>{% endif %}
+            </li>
+          {% empty %}<li class="list-group-item px-0 text-body-secondary">No response recorded yet.</li>{% endfor %}
+        </ul>
+      </article>
+    {% empty %}<p class="text-body-secondary mb-0">You have not submitted any support requests for this business.</p>{% endfor %}
+  </div></section>
+</main>
+{% endblock %}

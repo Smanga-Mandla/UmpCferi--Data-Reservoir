@@ -56,7 +56,7 @@ class AuthenticationAccessTests(TestCase):
         )
         self.client.force_login(user)
 
-        response = self.client.get(reverse("home"))
+        response = self.client.get(reverse("accounts:login"))
 
         self.assertRegex(
             response.content.decode(),
@@ -68,7 +68,7 @@ class AuthenticationAccessTests(TestCase):
         user = make_user()
         self.client.force_login(user)
 
-        response = self.client.get(reverse("home"))
+        response = self.client.get(reverse("accounts:login"))
 
         self.assertRegex(
             response.content.decode(),
@@ -307,14 +307,11 @@ class AuthenticationAccessTests(TestCase):
         self.assertEqual(throttle.failed_attempts, 0)
         self.assertIsNone(throttle.locked_until)
 
-    def test_session_is_ended_after_thirty_minutes_of_inactivity(self):
+    def test_explicit_logout_redirects_to_login(self):
         user = make_user()
         self.client.force_login(user)
-        session = self.client.session
-        session["_auth_last_activity"] = (timezone.now() - timedelta(minutes=31)).timestamp()
-        session.save()
 
-        response = self.client.get("/")
+        response = self.client.post(reverse("accounts:logout"))
 
         self.assertRedirects(response, reverse("accounts:login"))
         self.assertFalse(self.client.session.get("_auth_user_id"))

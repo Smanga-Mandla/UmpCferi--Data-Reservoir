@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Submit Monthly Progress | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container py-4">
+  <p><a href="{% url 'incubation:progress_history' business.pk %}">Monthly progress history</a></p>
+  <h1 class="h2">Submit Monthly Progress</h1>
+  <p class="text-body-secondary">{{ business.legal_name }}</p>
+  <div class="alert alert-info">Funding is the amount received during this reporting period. It does not change or replace your business's original onboarding baseline.</div>
+  <form method="post" class="card card-body" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="row g-3">
+      {% for field in form %}
+        <div class="{% if field.name == 'business_achievements' or field.name == 'challenges_experienced' or field.name == 'additional_comments' %}col-12{% else %}col-12 col-md-6{% endif %}">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="mt-4"><button class="btn btn-primary" type="submit">Submit progress update</button></div>
+  </form>
+</main>
+{% endblock %}

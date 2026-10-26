@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <p class="text-body-secondary mb-1">CFERI Staff workspace</p>
+      <h1 class="h2 mb-1">{{ page_title }}</h1>
+      <p class="text-body-secondary mb-0">Monitoring data is limited to businesses in your authorized read and update scope.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{% url 'incubation:account_list' %}">Manage Incubatees</a>
+  </div>
+  <nav class="nav nav-pills flex-wrap gap-2 mb-4" aria-label="Incubatee monitoring pages">
+    <a class="nav-link active" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>
+    <a class="nav-link" href="{% url 'incubation:staff_outstanding_progress' %}">Outstanding progress submissions</a>
+    <a class="nav-link" href="{% url 'incubation:staff_recent_progress' %}">Recently submitted progress</a>
+  </nav>
+  <form method="get" class="card card-body mb-4">
+    <div class="row g-2 align-items-end">
+      {% for field in monitoring_filter %}
+        <div class="col-sm-6 col-lg">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<div class="small text-danger">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <div class="col-auto"><button class="btn btn-primary" type="submit">Filter</button></div>
+      <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:staff_incubatee_monitoring' %}">Clear</a></div>
+    </div>
+    {% if monitoring_filter.non_field_errors %}<div class="alert alert-warning mt-3 mb-0">{{ monitoring_filter.non_field_errors }}</div>{% endif %}
+  </form>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Registered incubatee accounts</div><strong class="display-6">{{ monitoring_incubatee_count }}</strong></div></article></div>
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Student entrepreneurs</div><strong class="display-6">{{ monitoring_student_count }}</strong></div></article></div>
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">External SMEs</div><strong class="display-6">{{ monitoring_external_count }}</strong></div></article></div>
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Active businesses</div><strong class="display-6">{{ monitoring_active_count }}</strong></div></article></div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><a class="card h-100 text-decoration-none" href="{% url 'incubation:staff_outstanding_progress' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"><div class="card-body"><div class="text-body-secondary">Outstanding progress submissions</div><strong class="display-6">{{ monitoring_outstanding_count }}</strong><div class="small">Open queue</div></div></a></div>
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Pending document reviews</div><strong class="display-6">{{ monitoring_pending_document_count }}</strong></div></article></div>
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Open support requests</div><strong class="display-6">{{ monitoring_open_support_count }}</strong></div></article></div>
+    <div class="col-sm-6 col-xl-3"><a class="card h-100 text-decoration-none" href="{% url 'incubation:staff_recent_progress' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"><div class="card-body"><div class="text-body-secondary">Recently submitted progress</div><strong class="display-6">{{ monitoring_recent_count }}</strong><div class="small">Open submissions</div></div></a></div>
+  </div>
+  <div class="row g-4">
+    <section class="col-xl-6"><div class="card h-100"><div class="card-body">
+      <h2 class="h5">Pending document reviews</h2>
+      <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Business</th><th>Document</th><th>Uploaded</th></tr></thead><tbody>
+        {% for document in monitoring_pending_documents %}<tr><td>{{ document.incubatee.legal_name }}</td><td>{{ document.title }}</td><td>{{ document.created_at|date:"j M Y" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No documents awaiting review.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div></div></section>
+    <section class="col-xl-6"><div class="card h-100"><div class="card-body">
+      <h2 class="h5">Open support requests</h2>
+      <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Business</th><th>Category</th><th>Status</th></tr></thead><tbody>
+        {% for support in monitoring_open_support %}<tr><td>{{ support.incubatee.legal_name }}</td><td>{{ support.get_category_display }}</td><td>{{ support.get_status_display }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No open support requests.</td></tr>{% endfor %}
+      </tbody></table></div>
+      <h2 class="h5 mt-4">Upcoming mentorship sessions</h2>
+      <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Business</th><th>Date</th><th>Mentor</th></tr></thead><tbody>
+        {% for session in monitoring_upcoming_sessions %}<tr><td>{{ session.incubatee.legal_name }}</td><td>{{ session.session_date|date:"j M Y" }}</td><td>{{ session.mentor|default:"Not assigned" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No upcoming sessions.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div></div></section>
+  </div>
+</main>
+{% endblock %}
