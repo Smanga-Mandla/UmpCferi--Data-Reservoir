@@ -99,6 +99,23 @@ body {
   color: #5b5d70;
 }
 
+.profile-avatar {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.25rem;
+  border: 2px solid rgb(247 166 0 / 60%);
+  border-radius: 50%;
+  background-color: var(--ump-navy);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
 .nav-signin-btn {
   min-width: 7rem;
   border-radius: 999px;

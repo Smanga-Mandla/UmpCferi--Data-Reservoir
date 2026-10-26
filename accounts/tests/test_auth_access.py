@@ -47,6 +47,35 @@ def assign_role(user, code):
 
 
 class AuthenticationAccessTests(TestCase):
+    def test_navbar_shows_profile_initials_instead_of_email(self):
+        user = User.objects.create_user(
+            email="sam.mandla@gmail.com",
+            password="Only-for-tests-9!",
+            first_name="Sam",
+            last_name="Mandla",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertRegex(
+            response.content.decode(),
+            r'class="profile-avatar"[^>]*>\s*SM\s*</span>',
+        )
+        self.assertNotContains(response, user.email)
+
+    def test_navbar_falls_back_to_email_initial_when_name_is_missing(self):
+        user = make_user()
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertRegex(
+            response.content.decode(),
+            r'class="profile-avatar"[^>]*>\s*T\s*</span>',
+        )
+        self.assertNotContains(response, user.email)
+
     def test_login_requires_gmail_email_and_at_least_eight_character_password(self):
         user = make_user()
 
