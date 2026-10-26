@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Impact report | UMP CFERI{% endblock %}
 {% block content %}
-<div class="container-fluid py-4"><div class="row g-0">
-  {% include "includes/sidebar.html" %}
-  <section class="col-md-9 col-lg-10 px-md-4">
+<div class="container-fluid py-4">
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
       <div><h1 class="h2">Impact dashboard</h1><p class="text-body-secondary">Period-scoped recorded observations; missing values are excluded, not treated as zero.</p></div>
       <div class="d-flex gap-2"><a class="btn btn-outline-success" href="{% url 'reporting:impact_export' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:impact_export' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>
@@ -25,7 +23,6 @@
       {% endfor %}
     </div>
     <p class="small text-body-secondary mt-3">Metric formulas and the founder youth age threshold remain provisional; see the Open Decisions register.</p>
-  </section>
 </div></div>
 {{ chart_categories|json_script:"impact-categories" }}
 {{ chart_jobs|json_script:"impact-jobs" }}

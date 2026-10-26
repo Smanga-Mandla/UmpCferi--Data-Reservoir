@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from xml.sax.saxutils import escape
 
@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.decorators.http import require_GET
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 
 from accounts.access import accessible_queryset, has_access
 from accounts.models import Role, RoleGrant
@@ -37,11 +38,6 @@ from stakeholders.models import Stakeholder
 def _role_context(request):
     user = request.user
     return {
-        "dashboard_roles": (
-            Role.objects.all()
-            if user.is_superuser
-            else Role.objects.filter(users=user)
-        ).order_by("code"),
         "can_manage_users": user.is_superuser
         or user.roles.filter(code__in=("super_admin", "system_admin")).exists(),
         "can_manage_role_matrix": user.is_superuser
@@ -57,15 +53,14 @@ def _role_context(request):
 
 class DashboardIndexView(LoginRequiredMixin, View):
     def get(self, request):
-        context = _role_context(request)
-        context["roles"] = context["dashboard_roles"]
-        context["can_view_reports"] = has_access(
-            request.user, RoleGrant.Resource.REPORTS, RoleGrant.Action.READ
-        )
-        context["can_view_audit_log"] = has_access(
-            request.user, RoleGrant.Resource.AUDIT_LOG, RoleGrant.Action.READ
-        )
-        return render(request, "reporting/dashboard_index.html", context)
+        roles = Role.objects.filter(users=request.user).order_by("code")
+        if request.user.is_superuser:
+            role = Role.objects.get(code=Role.Code.SUPER_ADMIN)
+        else:
+            role = roles.first()
+        if role is None:
+            raise PermissionDenied
+        return _render_role_dashboard(request, role)
 
 
 class RoleDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -81,24 +76,53 @@ class RoleDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
         raise PermissionDenied
 
     def get(self, request):
-        if not has_access(
-            request.user, RoleGrant.Resource.REPORTS, RoleGrant.Action.READ
-        ):
-            if request.user.roles.filter(code=Role.Code.SYSTEM_ADMIN).exists():
-                return render(
-                    request,
-                    "reporting/role_dashboard.html",
-                    {
-                        **_role_context(request),
-                        "role": Role.objects.get(code=self.role_code),
-                        "system_health_only": True,
-                    },
-                )
+        return _render_role_dashboard(
+            request, Role.objects.get(code=self.role_code)
+        )
+
+
+def _render_role_dashboard(request, role):
+    context = {
+        **_role_context(request),
+        "role": role,
+        "system_health_only": False,
+    }
+    if not has_access(
+        request.user, RoleGrant.Resource.REPORTS, RoleGrant.Action.READ
+    ):
+        if not request.user.roles.filter(code=Role.Code.SYSTEM_ADMIN).exists():
             raise PermissionDenied
-        data = dashboard_data(request.user)
-        context = {
-            **_role_context(request),
-            "role": Role.objects.get(code=self.role_code),
+        User = get_user_model()
+        now = timezone.now()
+        week_ago = now - timedelta(days=7)
+        month_ahead = now + timedelta(days=30)
+        context.update(
+            {
+                "system_health_only": True,
+                "active_user_count": User.objects.filter(is_active=True).count(),
+                "expiring_account_count": User.objects.filter(
+                    roles__code__in=(
+                        Role.Code.FREELANCER,
+                        Role.Code.EXTERNAL_GUEST,
+                    ),
+                    access_expires_at__gt=now,
+                    access_expires_at__lte=month_ahead,
+                ).distinct().count(),
+                "failed_login_count": AuditEvent.objects.filter(
+                    action=AuditEvent.Action.LOGIN,
+                    outcome="failure",
+                    occurred_at__gte=week_ago,
+                ).count(),
+                "recent_audit_events": AuditEvent.objects.filter(
+                    occurred_at__gte=week_ago
+                ).select_related("actor")[:8],
+            }
+        )
+        return render(request, "reporting/role_dashboard.html", context)
+
+    data = dashboard_data(request.user)
+    context.update(
+        {
             **data,
             "quality_rows": data_quality_rows(request.user),
             "can_view_impact": has_access(
@@ -116,7 +140,8 @@ class RoleDashboardView(LoginRequiredMixin, UserPassesTestMixin, View):
                 item["count"] for item in data["incubatee_status_counts"]
             ],
         }
-        return render(request, "reporting/role_dashboard.html", context)
+    )
+    return render(request, "reporting/role_dashboard.html", context)
 
 
 class ImpactDashboardView(LoginRequiredMixin, View):

@@ -145,7 +145,7 @@ def dashboard_data(user):
     else:
         incubatee_ids = list(incubatees.values_list("pk", flat=True))
     allowed_checkins = _report_checkins(
-        user, incubatee_ids, board_aggregate=board_aggregate
+        user, incubatees, board_aggregate=board_aggregate
     )
     documents = [
         document

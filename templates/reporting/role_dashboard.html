@@ -2,17 +2,20 @@
 {% block title %}{{ role.get_code_display }} Dashboard | UMP CFERI{% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
-  <div class="row g-0">
-    {% include "includes/sidebar.html" %}
-    <section class="col-md-9 col-lg-10 px-md-4">
-      <p class="text-primary fw-semibold text-uppercase small mb-2">Role dashboard</p>
+      <p class="text-primary fw-semibold text-uppercase small mb-2">CFERI overview</p>
       <div class="d-flex justify-content-between align-items-start">
-        <div><h1 class="h2">{{ role.get_code_display }}</h1><p class="text-body-secondary">Operational and reporting information available to your role.</p></div>
+        <div><h1 class="h2">Dashboard</h1><p class="text-body-secondary">Current operational information available to your account.</p></div>
         {% if can_view_impact %}<a class="btn btn-outline-primary" href="{% url 'reporting:impact' %}">Impact report</a>{% endif %}
         {% if can_export_dashboard %}<a class="btn btn-outline-success" href="{% url 'reporting:dashboard_export' role.code 'xlsx' %}">Export Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:dashboard_export' role.code 'pdf' %}">Export PDF</a>{% endif %}
       </div>
       {% if system_health_only %}
-        <div class="alert alert-info">Your role has system-health reporting access only. Business dashboards and incubatee information are not available through this account.</div>
+        <div class="alert alert-info">Business performance data is not included in this system-health overview.</div>
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Active accounts</div><div class="display-6">{{ active_user_count }}</div><div class="small">Currently enabled</div></div></div></div>
+          <div class="col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Guest and freelancer access ending</div><div class="display-6">{{ expiring_account_count }}</div><div class="small">Within the next 30 days</div></div></div></div>
+          <div class="col-sm-6 col-xl-4"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Failed sign-ins</div><div class="display-6">{{ failed_login_count }}</div><div class="small">Recorded in the last 7 days</div></div></div></div>
+        </div>
+        <div class="card mb-4"><div class="card-body"><h2 class="h5">Recent system activity</h2><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Activity</th><th>Area</th><th>Time</th></tr></thead><tbody>{% for event in recent_audit_events %}<tr><td>{{ event.get_action_display }}</td><td>{{ event.resource|title }}</td><td>{{ event.occurred_at }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No audit activity recorded in the last 7 days.</td></tr>{% endfor %}</tbody></table></div><a href="{% url 'reporting:audit_log' %}">Open audit log</a></div></div>
       {% else %}
         <div class="row g-3 mb-4">
           <div class="col-sm-6 col-xl-3"><div class="card h-100"><div class="card-body"><div class="text-body-secondary">Incubatees in permitted scope</div><div class="display-6">{% if incubatee_total is not None %}{{ incubatee_total }}{% else %}Suppressed{% endif %}</div><div class="small">Businesses</div></div></div></div>
@@ -34,8 +37,6 @@
           <div class="card mb-4"><div class="card-body"><h2 class="h5">Data quality</h2><p class="text-body-secondary small">Profile completeness is the share of five tracked report fields populated. It is a technical indicator, not an official mandatory-field policy.</p><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Incubatee</th><th>Profile completeness</th><th>Missing tracked fields</th><th>Duplicate warning</th><th>Overdue</th><th>Latest check-in completeness</th></tr></thead><tbody>{% for row in quality_rows %}<tr><td><a href="{% url 'incubation:detail' row.incubatee.pk %}">{{ row.incubatee }}</a></td><td>{{ row.profile_completeness }}%</td><td>{{ row.missing|join:", "|default:"None flagged" }}</td><td>{% if row.possible_duplicate %}<span class="text-danger">Review possible duplicate</span>{% else %}—{% endif %}</td><td>{{ row.overdue|yesno:"Yes,No" }}</td><td>{% if row.completeness is not None %}{{ row.completeness }}%{% else %}No submitted check-in{% endif %}</td></tr>{% endfor %}</tbody></table></div></div></div>
         {% endif %}
       {% endif %}
-    </section>
-  </div>
 </div>
 {% if not system_health_only %}
 {{ chart_status_labels|json_script:"status-labels" }}

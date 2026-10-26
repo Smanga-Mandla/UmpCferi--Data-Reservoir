@@ -116,6 +116,45 @@ class ReportingAndAuditTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, "Incubatees by status")
 
+    def test_dashboard_home_shows_super_admin_operational_data_not_role_links(self):
+        super_admin = self.create_user(
+            "reporting-super-admin@gmail.com", Role.Code.SUPER_ADMIN
+        )
+        incubatee = Incubatee.objects.create(
+            legal_name="Synthetic Dashboard Company",
+            created_by=self.admin,
+        )
+        self.login_with_mfa(super_admin)
+
+        response = self.client.get(reverse("reporting:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Incubatees by status")
+        self.assertContains(response, "Synthetic Dashboard Company")
+        self.assertNotContains(response, "Your dashboards")
+        self.assertNotContains(response, "Open role dashboard")
+        self.assertNotContains(response, reverse("reporting:super_admin"))
+        self.assertEqual(response.context["incubatee_total"], 1)
+
+    def test_system_admin_dashboard_shows_system_health_data(self):
+        AuditEvent.objects.create(
+            actor=self.admin,
+            action=AuditEvent.Action.LOGIN,
+            resource="accounts.user",
+            object_id=str(self.admin.pk),
+            outcome="failure",
+        )
+        self.login_with_mfa(self.system_admin)
+
+        response = self.client.get(reverse("reporting:dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Active accounts")
+        self.assertContains(response, "Failed sign-ins")
+        self.assertContains(response, "Recent system activity")
+        self.assertNotContains(response, "Incubatees by status")
+        self.assertEqual(response.context["failed_login_count"], 1)
+
     def test_board_analytics_api_returns_only_suppressed_aggregate(self):
         incubatee = Incubatee.objects.create(
             legal_name="Synthetic Board API Company",

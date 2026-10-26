@@ -63,6 +63,16 @@ Remove-Item Env:RUN_DB_CONNECTIVITY_TESTS
 
 To create an administrator interactively, use `python manage.py createsuperuser`. Django prompts for credentials; no default account or password is installed. The Django superuser has Super Admin access in the project authorization layer. Assign regular accounts through the protected account-management UI.
 
+### Synthetic demonstration data
+
+For a local development database only, create an existing local user first and seed a clearly synthetic sample dataset:
+
+```powershell
+python manage.py seed_demo_data --actor-email your-local-admin@gmail.com
+```
+
+The command refuses to run outside development settings or against a non-local database, does not create user accounts, and is safe to rerun without deleting or replacing existing records. It creates representative document, partner/MOU, stakeholder, incubation, interaction, reporting, and audit data. Synthetic partner logo images and sample PDF attachments are written to private media storage. Every sample is marked `DEMO ONLY`; do not use these records for operational decisions or treat them as real CFERI information.
+
 ## Authentication and access control
 
 - Argon2 is the preferred password hasher. Email addresses are normalized and authenticated case-insensitively.

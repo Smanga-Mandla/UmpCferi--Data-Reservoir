@@ -1,9 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Audit log | UMP CFERI{% endblock %}
 {% block content %}
-<div class="container-fluid py-4"><div class="row g-0">
-  {% include "includes/sidebar.html" %}
-  <section class="col-md-9 col-lg-10 px-md-4">
+<div class="container-fluid py-4">
     <h1 class="h2">Audit log</h1>
     <p class="text-body-secondary">Read-only audit events, newest first. Results are limited to the latest 500 events.</p>
     {% if can_export %}<div class="d-flex gap-2 mb-3"><a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'audit' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'audit' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a></div>{% endif %}
@@ -20,6 +18,5 @@
         <td><code class="small">{{ event.metadata }}</code></td><td><span class="small">{{ event.ip_address|default:"—" }}</span></td>
       </tr>{% empty %}<tr><td colspan="8" class="text-body-secondary text-center py-4">No audit events match these filters.</td></tr>{% endfor %}</tbody>
     </table></div></div>
-  </section>
 </div></div>
 {% endblock %}

@@ -84,10 +84,12 @@ class ProjectConfigurationTests(SimpleTestCase):
         self.assertContains(home, "University of Mpumalanga")
         self.assertContains(home, "CFERI")
         self.assertContains(home, "images/ump-crest.png")
+        self.assertContains(home, "nav-signin-btn")
         response = self.client.get(reverse("accounts:login"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Email address")
         self.assertContains(response, "Authenticator code")
+        self.assertNotContains(response, "nav-signin-btn")
         self.assertNotContains(response, "placeholder=")
 
     def test_dashboard_requires_authentication(self):

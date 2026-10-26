@@ -8,6 +8,10 @@
 - **Current state:** SRS requirements are tracked against implementation and verification. Phases 1–8 are implemented to the extent noted below. Phase 9 reporting, exports, and audit have passed focused and full-suite verification in the isolated test environment; open metric and privacy rules remain documented rather than assumed.
 - **Phase 10 acceptance:** The detailed acceptance matrix below is authoritative for each requirement's required status vocabulary, test evidence, and remaining issues; earlier phase summaries retain their historical implementation notes.
 
+## Development-only demonstration data
+
+The `seed_demo_data` management command creates representative, clearly marked synthetic records for local development across documents, partners/MOUs, stakeholders, incubation, interactions, reporting inputs, and audit. It generates placeholder partner images and sample PDF attachments in private storage. The command does not create users, is idempotent, requires an existing active local actor, and refuses non-development or remote database targets. This development aid is not an SRS requirement and does not count as evidence that any functional requirement is implemented or verified. The production/remote database was intentionally left untouched.
+
 ## Authentication and access control
 
 | ID | Priority | Requirement | Status |
