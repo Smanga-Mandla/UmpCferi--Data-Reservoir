@@ -2,6 +2,7 @@ from django.urls import path
 
 from incubation import views
 from incubation import account_views
+from incubation import business_development_views
 from incubation import dashboard_views
 from incubation import portal_views
 from incubation import progress_views
@@ -12,6 +13,31 @@ app_name = "incubation"
 
 urlpatterns = [
     path("my-dashboard/", dashboard_views.incubatee_dashboard, name="incubatee_dashboard"),
+    path(
+        "my/<uuid:incubatee_id>/business-development-needs/",
+        business_development_views.business_development_needs,
+        name="business_development_needs",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-development-needs/<int:need_id>/evidence/",
+        business_development_views.business_development_need_evidence_download,
+        name="business_development_need_evidence_download",
+    ),
+    path(
+        "my/<uuid:incubatee_id>/business-development-needs/<int:need_id>/updates/<int:update_id>/evidence/",
+        business_development_views.business_development_need_update_evidence_download,
+        name="business_development_need_update_evidence_download",
+    ),
+    path(
+        "staff/business-development-needs/",
+        business_development_views.staff_business_development_needs,
+        name="staff_business_development_needs",
+    ),
+    path(
+        "staff/business-development-needs/<int:need_id>/update/",
+        business_development_views.staff_business_development_need_update,
+        name="staff_business_development_need_update",
+    ),
     path(
         "my/<uuid:incubatee_id>/reports/",
         report_views.incubatee_reports,

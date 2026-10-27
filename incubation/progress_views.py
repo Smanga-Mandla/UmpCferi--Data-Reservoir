@@ -44,6 +44,9 @@ PROGRESS_METRICS = {
     "part_time_women": IncubateeMetricObservation.Metric.PART_TIME_WOMEN,
     "part_time_youth": IncubateeMetricObservation.Metric.PART_TIME_YOUTH,
     "funding_received_zar": IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR,
+    "funding_source": IncubateeMetricObservation.Metric.FUNDING_SOURCE,
+    "business_stage": IncubateeMetricObservation.Metric.BUSINESS_STAGE,
+    "support_needed": IncubateeMetricObservation.Metric.SUPPORT_NEEDED,
 }
 
 
@@ -178,6 +181,14 @@ def progress_submit(request, incubatee_id):
                         )
                     for field, metric in PROGRESS_METRICS.items():
                         value = form.cleaned_data[field]
+                        if value is None:
+                            continue
+                        if metric in {
+                            IncubateeMetricObservation.Metric.FUNDING_SOURCE,
+                            IncubateeMetricObservation.Metric.BUSINESS_STAGE,
+                            IncubateeMetricObservation.Metric.SUPPORT_NEEDED,
+                        } and not value:
+                            continue
                         observation = IncubateeMetricObservation(
                             incubatee=locked_business,
                             period_type=IncubateeMetricObservation.PeriodType.MONTHLY,
@@ -192,6 +203,12 @@ def progress_submit(request, incubatee_id):
                             IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR,
                         }:
                             observation.decimal_value = value
+                        elif metric in {
+                            IncubateeMetricObservation.Metric.FUNDING_SOURCE,
+                            IncubateeMetricObservation.Metric.BUSINESS_STAGE,
+                            IncubateeMetricObservation.Metric.SUPPORT_NEEDED,
+                        }:
+                            observation.text_value = value or ""
                         else:
                             observation.integer_value = value
                         observation.save()

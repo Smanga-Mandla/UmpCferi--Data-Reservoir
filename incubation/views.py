@@ -1,4 +1,3 @@
-import json
 import hashlib
 import logging
 from datetime import date, datetime
@@ -9,7 +8,6 @@ from zipfile import BadZipFile
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 from django.forms import formset_factory
@@ -31,6 +29,7 @@ from incubation.access import (
     is_aggregate_only,
     role_codes,
 )
+from incubation.baselines import capture_incubatee_baseline
 from incubation.forms import (
     AssignmentForm,
     BusinessInformationForm,
@@ -58,7 +57,6 @@ from incubation.models import (
     FounderProfile,
     Incubatee,
     IncubateeAccessEvent,
-    IncubateeBaselineSnapshot,
     IncubateeConsent,
     IncubateeDocument,
     IncubateeExit,
@@ -136,46 +134,7 @@ def _log_access(request, incubatee, action, resource="", object_id=""):
 
 
 def _snapshot(incubatee, actor, source=None):
-    excluded = {
-        "id",
-        "created_by",
-        "updated_by",
-        "created_at",
-        "updated_at",
-        "deleted_at",
-        "deleted_by",
-        "owner",
-        "assigned_users",
-    }
-    snapshot = {
-        field.name: getattr(incubatee, field.attname)
-        for field in incubatee._meta.concrete_fields
-        if field.name not in excluded and field.attname not in excluded
-    }
-    founders = []
-    for link in incubatee.founders.filter(is_active=True).select_related("founder__stakeholder"):
-        profile = link.founder
-        founders.append(
-            {
-                "stakeholder_id": profile.stakeholder_id,
-                "name": profile.stakeholder.name,
-                "id_number_encrypted": profile.id_number_encrypted,
-                "gender": profile.gender,
-                "date_of_birth": profile.date_of_birth,
-                "race": profile.race,
-                "disability_status": profile.disability_status,
-                "highest_qualification": profile.highest_qualification,
-                "prior_business_experience": profile.prior_business_experience,
-                "ownership_percentage": link.ownership_percentage,
-            }
-        )
-    IncubateeBaselineSnapshot.objects.create(
-        incubatee=incubatee,
-        snapshot=json.loads(json.dumps(snapshot, cls=DjangoJSONEncoder)),
-        founder_snapshot=json.loads(json.dumps(founders, cls=DjangoJSONEncoder)),
-        source=source or incubatee.source,
-        changed_by=actor,
-    )
+    return capture_incubatee_baseline(incubatee, actor, source)
 
 
 def _active_incubatees(user, action=RoleGrant.Action.READ):
@@ -463,7 +422,15 @@ def onboarding_step(request, incubatee_id, step):
                 incubatee.refresh_from_db()
                 incubatee.updated_by = request.user
                 incubatee.save(update_fields=("updated_by", "updated_at"))
-                _snapshot(incubatee, request.user)
+                _snapshot(
+                    incubatee,
+                    request.user,
+                    source=(
+                        "initial_onboarding_baseline"
+                        if step == 7
+                        else None
+                    ),
+                )
         if step == 8:
             messages.success(request, "Onboarding consent responses were recorded.")
             return redirect("incubation:detail", incubatee_id=incubatee.pk)

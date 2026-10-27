@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404, render
 
 from accounts.access import accessible_queryset
 from accounts.models import Role, RoleGrant
-from incubation.models import Incubatee, IncubateeAccount
+from incubation.models import Incubatee, IncubateeAccount, IncubateeBusinessDevelopmentNeed
 
 
 @login_required
@@ -36,4 +36,13 @@ def incubatee_dashboard(request):
     if business is None:
         return render(request, "incubation/account_management/dashboard.html", context)
 
+    outstanding_needs = IncubateeBusinessDevelopmentNeed.objects.filter(
+        incubatee=business,
+        status__in=(
+            IncubateeBusinessDevelopmentNeed.Status.OPEN,
+            IncubateeBusinessDevelopmentNeed.Status.IN_PROGRESS,
+        ),
+    ).select_related("assigned_to")
+    context["outstanding_business_development_needs"] = outstanding_needs
+    context["outstanding_business_development_need_count"] = outstanding_needs.count()
     return render(request, "incubation/account_management/dashboard.html", context)

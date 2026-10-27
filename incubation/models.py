@@ -43,6 +43,26 @@ def support_request_evidence_path(instance, filename):
     return f"incubatees/{instance.incubatee_id}/support-requests/{uuid.uuid4()}{extension}"
 
 
+def business_development_need_evidence_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:16]
+    if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
+        extension = ""
+    return (
+        f"incubatees/{instance.incubatee_id}/business-development/"
+        f"{uuid.uuid4()}{extension}"
+    )
+
+
+def business_development_evidence_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:16]
+    if any(character not in ".abcdefghijklmnopqrstuvwxyz0123456789" for character in extension):
+        extension = ""
+    return (
+        f"incubatees/{instance.need.incubatee_id}/business-development/"
+        f"{uuid.uuid4()}{extension}"
+    )
+
+
 class Programme(models.Model):
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True)
@@ -118,6 +138,12 @@ class Incubatee(AccessControlledModel):
         EARLY_REVENUE = "early_revenue", "Early revenue"
         GROWTH = "growth", "Growth"
 
+    class RegistrationStatus(models.TextChoices):
+        UNKNOWN = "unknown", "Not specified"
+        NOT_REGISTERED = "not_registered", "Not registered"
+        PENDING = "pending", "Registration pending"
+        REGISTERED = "registered", "Registered"
+
     class Formality(models.TextChoices):
         FORMAL = "formal", "Formal"
         INFORMAL = "informal", "Informal"
@@ -136,6 +162,11 @@ class Incubatee(AccessControlledModel):
     trading_name = models.CharField(max_length=255, blank=True)
     cipc_registration_number = models.CharField(max_length=128, blank=True, null=True, unique=True)
     date_registered = models.DateField(null=True, blank=True)
+    business_registration_status = models.CharField(
+        max_length=24,
+        choices=RegistrationStatus.choices,
+        default=RegistrationStatus.UNKNOWN,
+    )
     entity_type = models.CharField(max_length=32, choices=EntityType.choices, blank=True)
     vat_status = models.CharField(max_length=24, choices=VATStatus.choices, blank=True)
     tax_number = models.CharField(max_length=128, blank=True)
@@ -854,6 +885,8 @@ class IncubateeMetricObservation(models.Model):
         JOBS_LOST = "jobs_lost", "Jobs lost"
         FUNDING_APPLIED_ZAR = "funding_applied_zar", "Funding applied for (ZAR)"
         FUNDING_RECEIVED_ZAR = "funding_received_zar", "Funding received (ZAR)"
+        FUNDING_SOURCE = "funding_source", "Funding source this month"
+        BUSINESS_STAGE = "business_stage", "Business stage this month"
         BIGGEST_WIN = "biggest_win", "Biggest win"
         BIGGEST_CHALLENGE = "biggest_challenge", "Biggest challenge"
         CHALLENGE_CATEGORY = "challenge_category", "Challenge category"
@@ -1065,7 +1098,10 @@ class MonthlyCheckInEvidence(models.Model):
 
 class IncubateeMilestone(models.Model):
     class Type(models.TextChoices):
+        BUSINESS_IDEA_DEVELOPED = "business_idea_developed", "Business idea developed"
         BUSINESS_REGISTRATION = "business_registration", "Business registration completed"
+        PRODUCT_DEVELOPED = "product_developed", "Product developed"
+        FIRST_CUSTOMER = "first_customer", "First customer acquired"
         FIRST_SALE = "first_sale", "First sale"
         FIRST_HIRE = "first_hire", "First hire"
         FUNDING_RAISED = "funding_raised", "Funding raised"
@@ -1073,6 +1109,7 @@ class IncubateeMilestone(models.Model):
         AWARD = "award", "Award"
         PRODUCT_LAUNCH = "product_launch", "Product launch"
         NEW_MARKET = "new_market", "New market entered"
+        OTHER_ACHIEVEMENT = "other_achievement", "Other business achievement"
 
     title = models.CharField(max_length=255, blank=True)
     incubatee = models.ForeignKey(
@@ -1445,6 +1482,170 @@ class IncubateeSupportRequestUpdate(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionDenied("Support request updates are retained.")
+
+
+class IncubateeBusinessDevelopmentNeedQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise PermissionDenied("Business development needs must be updated with history.")
+
+    def delete(self):
+        raise PermissionDenied("Business development needs are retained as history.")
+
+
+class IncubateeBusinessDevelopmentNeed(models.Model):
+    class Category(models.TextChoices):
+        BUSINESS_IDEA = "business_idea", "Need a business idea"
+        REFINE_IDEA = "refine_idea", "Refine an existing business idea"
+        REGISTRATION = "registration", "Business registration assistance"
+        MARKETING = "marketing", "Marketing products or services"
+        PRODUCT_DEVELOPMENT = "product_development", "Product development"
+        FUNDING = "funding", "Funding assistance"
+        FINANCIAL_MANAGEMENT = "financial_management", "Financial management"
+        TECHNOLOGY = "technology", "Technology and digital transformation"
+        MENTORSHIP = "mentorship", "Business mentorship"
+        MARKET_ACCESS = "market_access", "Market access"
+        COMPLIANCE = "compliance", "Business compliance"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        IN_PROGRESS = "in_progress", "In progress"
+        RESOLVED = "resolved", "Resolved"
+
+    incubatee = models.ForeignKey(
+        Incubatee, on_delete=models.PROTECT, related_name="business_development_needs"
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="submitted_business_development_needs",
+    )
+    category = models.CharField(max_length=32, choices=Category.choices)
+    description = models.TextField(blank=True)
+    identified_at = models.DateField(default=timezone.localdate, db_index=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.OPEN, db_index=True
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="assigned_business_development_needs",
+    )
+    resolution_date = models.DateField(null=True, blank=True)
+    evidence = models.FileField(
+        upload_to=business_development_need_evidence_path, max_length=512, blank=True
+    )
+    evidence_original_filename = models.CharField(max_length=255, blank=True)
+    evidence_content_type = models.CharField(max_length=127, blank=True)
+    evidence_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    support_request = models.OneToOneField(
+        IncubateeSupportRequest,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="business_development_need",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("status", "-identified_at", "-pk")
+
+    objects = IncubateeBusinessDevelopmentNeedQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).first()
+            if previous and any(
+                getattr(previous, field) != getattr(self, field)
+                for field in (
+                    "incubatee_id",
+                    "requested_by_id",
+                    "category",
+                    "description",
+                    "identified_at",
+                    "evidence",
+                    "evidence_original_filename",
+                    "evidence_content_type",
+                    "evidence_size_bytes",
+                    "support_request_id",
+                    "created_at",
+                )
+            ):
+                raise PermissionDenied("Business development need details are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Business development needs are retained as history.")
+
+
+class IncubateeBusinessDevelopmentNeedUpdateQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise PermissionDenied("Business development need updates are immutable.")
+
+    def delete(self):
+        raise PermissionDenied("Business development need updates are retained.")
+
+
+class IncubateeBusinessDevelopmentNeedUpdate(models.Model):
+    need = models.ForeignKey(
+        IncubateeBusinessDevelopmentNeed,
+        on_delete=models.PROTECT,
+        related_name="updates",
+    )
+    status = models.CharField(
+        max_length=16, choices=IncubateeBusinessDevelopmentNeed.Status.choices
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="business_development_need_updates",
+    )
+    support_provided = models.TextField(blank=True)
+    outcome = models.TextField(blank=True)
+    resolution_date = models.DateField(null=True, blank=True)
+    evidence = models.FileField(
+        upload_to=business_development_evidence_path, max_length=512, blank=True
+    )
+    evidence_original_filename = models.CharField(max_length=255, blank=True)
+    evidence_content_type = models.CharField(max_length=127, blank=True)
+    evidence_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    mentoring_session = models.ForeignKey(
+        "incubation.MentoringSession",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="business_development_need_updates",
+    )
+    interaction = models.ForeignKey(
+        "interactions.Interaction",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="business_development_need_updates",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="recorded_business_development_need_updates",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at", "-pk")
+
+    objects = IncubateeBusinessDevelopmentNeedUpdateQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            raise PermissionDenied("Business development need updates are immutable.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise PermissionDenied("Business development need updates are retained.")
 
 
 class IncubateePortalNotification(models.Model):

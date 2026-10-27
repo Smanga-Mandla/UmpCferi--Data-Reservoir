@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Business Development Needs | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <p class="text-body-secondary mb-1">CFERI Staff workspace</p>
+      <h1 class="h2 mb-1">Business Development Needs</h1>
+      <p class="text-body-secondary mb-0">Only businesses in your authorized read and update scope are shown.</p>
+    </div>
+    <a class="btn btn-outline-primary" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>
+  </div>
+  <form method="get" class="mb-4">
+    <label for="status" class="form-label">Filter by status</label>
+    <select id="status" name="status" class="form-select d-inline-block w-auto">
+      <option value="">All statuses</option>
+      {% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit">Filter</button>
+  </form>
+  {% for need in needs_page %}
+    <section class="card mb-4">
+      <div class="card-header d-flex flex-wrap justify-content-between gap-2">
+        <strong>{{ need.incubatee.legal_name }} · {{ need.get_category_display }}</strong>
+        <span>{{ need.identified_at|date:"j M Y" }} · {{ need.get_status_display }}</span>
+      </div>
+      <div class="card-body">
+        <p class="mb-1"><strong>Submitted by:</strong> {{ need.requested_by.get_full_name|default:need.requested_by.email }}</p>
+        {% if need.description %}<p>{{ need.description|linebreaksbr }}</p>{% endif %}
+        {% if need.support_request_id %}<p><a href="{% url 'incubation:support_request_review_list' %}">Review linked support request</a></p>{% endif %}
+        {% if need.evidence %}<p><a href="{% url 'incubation:business_development_need_evidence_download' need.incubatee.pk need.pk %}">Download initial evidence</a></p>{% endif %}
+        <details class="mb-3">
+          <summary>Assistance history ({{ need.updates.count }})</summary>
+          <ul class="list-group list-group-flush mt-2">
+            {% for update in need.updates.all %}
+              <li class="list-group-item px-0">
+                <strong>{{ update.get_status_display }}</strong> · {{ update.created_at|date:"j M Y, H:i" }} · {{ update.updated_by.get_full_name|default:update.updated_by.email }}
+                {% if update.support_provided %}<p class="mb-1"><strong>Assistance:</strong> {{ update.support_provided|linebreaksbr }}</p>{% endif %}
+                {% if update.outcome %}<p class="mb-1"><strong>Outcome:</strong> {{ update.outcome|linebreaksbr }}</p>{% endif %}
+                {% if update.mentoring_session %}<p class="small mb-1">Mentoring session {{ update.mentoring_session.session_date|date:"j M Y" }}</p>{% endif %}
+                {% if update.interaction %}<p class="small mb-1">{{ update.interaction.get_interaction_type_display }} · {{ update.interaction.occurred_at|date:"j M Y" }}</p>{% endif %}
+                {% if update.evidence %}<a href="{% url 'incubation:business_development_need_update_evidence_download' need.incubatee.pk need.pk update.pk %}">Download update evidence</a>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </details>
+        <form method="post" enctype="multipart/form-data" action="{% url 'incubation:staff_business_development_need_update' need.pk %}" class="border-top pt-3">
+          {% csrf_token %}
+          <h2 class="h6">Record assistance or update status</h2>
+          <div class="row g-3">
+            {% for field in need.update_form %}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">Record update</button>
+        </form>
+      </div>
+    </section>
+  {% empty %}<div class="alert alert-info">No business development needs match this filter in your authorized scope.</div>{% endfor %}
+  {% if needs_page.has_other_pages %}
+    <nav aria-label="Need pages">
+      <ul class="pagination">
+        {% if needs_page.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ needs_page.previous_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a></li>{% endif %}
+        <li class="page-item disabled"><span class="page-link">Page {{ needs_page.number }} of {{ needs_page.paginator.num_pages }}</span></li>
+        {% if needs_page.has_next %}<li class="page-item"><a class="page-link" href="?page={{ needs_page.next_page_number }}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a></li>{% endif %}
+      </ul>
+    </nav>
+  {% endif %}
+</main>
+{% endblock %}

@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from documents.validators import validate_document_file
 from incubation.models import IncubateeBusinessChallenge, IncubateeMilestone, IncubateeProgressReview
+from incubation.models import Incubatee
 
 
 class IncubateeProgressForm(forms.Form):
@@ -14,21 +15,52 @@ class IncubateeProgressForm(forms.Form):
     reporting_year = forms.IntegerField(min_value=1900, max_value=date.today().year)
     revenue_zar = forms.DecimalField(
         min_value=0, max_digits=16, decimal_places=2,
+        required=False,
         widget=forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+        help_text="Monthly revenue. Enter 0 if known to be zero; leave blank if unknown.",
     )
-    customer_count = forms.IntegerField(min_value=0)
-    full_time_employees = forms.IntegerField(min_value=0)
-    part_time_employees = forms.IntegerField(min_value=0)
-    full_time_men = forms.IntegerField(min_value=0)
-    full_time_women = forms.IntegerField(min_value=0)
-    full_time_youth = forms.IntegerField(min_value=0)
-    part_time_men = forms.IntegerField(min_value=0)
-    part_time_women = forms.IntegerField(min_value=0)
-    part_time_youth = forms.IntegerField(min_value=0)
+    customer_count = forms.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Reported customer count. Enter 0 if known to be zero; leave blank if unknown.",
+    )
+    full_time_employees = forms.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Enter 0 if known to have no full-time employees; leave blank if unknown.",
+    )
+    part_time_employees = forms.IntegerField(
+        min_value=0,
+        required=False,
+        help_text="Enter 0 if known to have no part-time employees; leave blank if unknown.",
+    )
+    full_time_men = forms.IntegerField(min_value=0, required=False)
+    full_time_women = forms.IntegerField(min_value=0, required=False)
+    full_time_youth = forms.IntegerField(min_value=0, required=False)
+    part_time_men = forms.IntegerField(min_value=0, required=False)
+    part_time_women = forms.IntegerField(min_value=0, required=False)
+    part_time_youth = forms.IntegerField(min_value=0, required=False)
     funding_received_zar = forms.DecimalField(
         min_value=0, max_digits=16, decimal_places=2,
+        required=False,
         widget=forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
-        help_text="Funding received during this reporting period, not cumulative funding.",
+        help_text="Funding received during this reporting period, not cumulative funding. Enter 0 if none; leave blank if unknown.",
+    )
+    funding_source = forms.CharField(
+        required=False,
+        max_length=1000,
+        widget=forms.TextInput(),
+        help_text="Source(s) of funding received this month, if applicable.",
+    )
+    business_stage = forms.ChoiceField(
+        choices=(("", "Not provided"), *Incubatee.BusinessStage.choices),
+        required=False,
+    )
+    support_needed = forms.CharField(
+        required=False,
+        max_length=4000,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        label="Support needed",
     )
     business_achievements = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
     challenges_experienced = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
@@ -58,14 +90,18 @@ class IncubateeProgressForm(forms.Form):
             ("part_time_men", "part_time_women", "part_time_employees"),
         )
         for men, women, total in pairs:
-            if all(name in cleaned for name in (men, women, total)):
+            if all(cleaned.get(name) is not None for name in (men, women, total)):
                 if cleaned[men] + cleaned[women] > cleaned[total]:
                     self.add_error(men, "Men and women cannot exceed the total in this employment group.")
         for youth, total in (
             ("full_time_youth", "full_time_employees"),
             ("part_time_youth", "part_time_employees"),
         ):
-            if youth in cleaned and total in cleaned and cleaned[youth] > cleaned[total]:
+            if (
+                cleaned.get(youth) is not None
+                and cleaned.get(total) is not None
+                and cleaned[youth] > cleaned[total]
+            ):
                 self.add_error(youth, "Youth count cannot exceed the employment total.")
         if "reporting_month" in cleaned and "reporting_year" in cleaned:
             month = int(cleaned["reporting_month"])
@@ -90,6 +126,9 @@ class IncubateeProgressForm(forms.Form):
                 "part_time_women",
                 "part_time_youth",
                 "funding_received_zar",
+                "funding_source",
+                "business_stage",
+                "support_needed",
             )
         }
 

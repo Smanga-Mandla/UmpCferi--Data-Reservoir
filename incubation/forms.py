@@ -2,14 +2,14 @@ from decimal import Decimal
 from pathlib import Path
 
 from django import forms
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.forms import formset_factory
 
 from accounts.access import accessible_queryset
-from accounts.models import Role, RoleGrant
+from accounts.models import RoleGrant
 from documents.validators import validate_document_file
+from incubation.account_access import assignable_cferi_staff
 from incubation.models import (
     Cohort,
     CheckInAccessLink,
@@ -28,9 +28,6 @@ from incubation.models import (
     QuarterlyReview,
 )
 from stakeholders.models import Stakeholder
-
-User = get_user_model()
-
 
 class BootstrapModelForm(forms.ModelForm):
     def apply_bootstrap(self):
@@ -277,9 +274,7 @@ class AssignmentForm(BootstrapModelForm):
         self.fields["cohort"].queryset = Cohort.objects.filter(is_active=True).select_related(
             "programme"
         )
-        self.fields["staff_owner"].queryset = User.objects.filter(
-            is_active=True, roles__code=Role.Code.CFERI_STAFF
-        ).distinct().order_by("email")
+        self.fields["staff_owner"].queryset = assignable_cferi_staff()
         self.fields["mentors"].queryset = accessible_queryset(
             user,
             RoleGrant.Resource.STAKEHOLDERS,
@@ -447,6 +442,7 @@ MONTHLY_CHECKIN_FIELDS = (
     ("jobs_lost", IncubateeMetricObservation.Metric.JOBS_LOST, "Jobs lost", "integer"),
     ("funding_applied_zar", IncubateeMetricObservation.Metric.FUNDING_APPLIED_ZAR, "Funding applied for (ZAR)", "decimal"),
     ("funding_received_zar", IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR, "Funding received (ZAR)", "decimal"),
+    ("funding_source", IncubateeMetricObservation.Metric.FUNDING_SOURCE, "Funding source(s)", "text"),
     ("biggest_win", IncubateeMetricObservation.Metric.BIGGEST_WIN, "Biggest win", "text"),
     ("biggest_challenge", IncubateeMetricObservation.Metric.BIGGEST_CHALLENGE, "Biggest challenge", "text"),
     ("challenge_category", IncubateeMetricObservation.Metric.CHALLENGE_CATEGORY, "Challenge category", "text"),

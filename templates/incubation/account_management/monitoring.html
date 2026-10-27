@@ -30,18 +30,50 @@
     {% if monitoring_filter.non_field_errors %}<div class="alert alert-warning mt-3 mb-0">{{ monitoring_filter.non_field_errors }}</div>{% endif %}
   </form>
   <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Businesses in scope</div><strong class="display-6">{{ monitoring_business_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Registered incubatee accounts</div><strong class="display-6">{{ monitoring_incubatee_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Student entrepreneurs</div><strong class="display-6">{{ monitoring_student_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">External SMEs</div><strong class="display-6">{{ monitoring_external_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Active businesses</div><strong class="display-6">{{ monitoring_active_count }}</strong></div></article></div>
   </div>
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Business development impact snapshot{% if monitoring_period %} · {{ monitoring_period|date:"F Y" }}{% endif %}</h2>
+      <div class="row g-3">
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Idea-stage businesses</div><strong class="h3">{{ monitoring_idea_stage_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Registered businesses</div><strong class="h3">{{ monitoring_registered_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Businesses with reported revenue &gt; 0</div><strong class="h3">{{ monitoring_revenue_business_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Latest reported customers</div><strong class="h3">{{ monitoring_total_customers }}</strong><small class="d-block">{{ monitoring_customer_business_count }} businesses with a reported value; unknown values excluded.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Employment change from baseline</div><strong class="h3">{% if monitoring_employment_business_count %}{{ monitoring_employment_change }}{% else %}Not available{% endif %}</strong><small class="d-block">{{ monitoring_employment_business_count }} businesses with complete baseline and latest full-/part-time totals. Employment is not summed across months.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Funding received in period</div><strong class="h3">{% if monitoring_funding_total is not None %}R {{ monitoring_funding_total|floatformat:2 }}{% else %}No recorded value{% endif %}</strong><small class="d-block">Monthly receipt observations; no lifetime/cumulative interpretation.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Milestone records</div><strong class="h3">{{ monitoring_milestone_count }}</strong><small class="d-block">Recorded milestones; verification status is shown in source records.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Support requests received</div><strong class="h3">{{ monitoring_support_request_received_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Business-need assistance records</div><strong class="h3">{{ monitoring_support_delivered_count }}</strong><small class="d-block">Need updates with explicit assistance recorded.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Support request responses</div><strong class="h3">{{ monitoring_support_response_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Mentoring sessions recorded</div><strong class="h3">{{ monitoring_mentoring_session_count }}</strong></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Accessible linked activities</div><strong class="h3">{{ monitoring_linked_interaction_count }}</strong><small class="d-block">Training/workshops may be represented as interactions.</small></div></div>
+        <div class="col-sm-6 col-xl-3"><div class="border rounded p-3 h-100"><div class="text-body-secondary">Monthly progress completion</div><strong class="h3">{% if monitoring_progress_completion_rate is not None %}{{ monitoring_progress_completion_rate }}%{% else %}No expected submissions{% endif %}</strong><small class="d-block">{{ monitoring_progress_submission_count }} submitted / {{ monitoring_progress_expected_count }} existing check-ins.</small></div></div>
+      </div>
+      <p class="small text-body-secondary mt-3 mb-0">These are record-based summaries in your authorized business scope, not causal impact estimates. Missing observations are excluded rather than treated as zero.</p>
+    </div>
+  </section>
   <div class="row g-3 mb-4">
     <div class="col-sm-6 col-xl-3"><a class="card h-100 text-decoration-none" href="{% url 'incubation:staff_outstanding_progress' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"><div class="card-body"><div class="text-body-secondary">Outstanding progress submissions</div><strong class="display-6">{{ monitoring_outstanding_count }}</strong><div class="small">Open queue</div></div></a></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Pending document reviews</div><strong class="display-6">{{ monitoring_pending_document_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><article class="card h-100"><div class="card-body"><div class="text-body-secondary">Open support requests</div><strong class="display-6">{{ monitoring_open_support_count }}</strong></div></article></div>
     <div class="col-sm-6 col-xl-3"><a class="card h-100 text-decoration-none" href="{% url 'incubation:staff_recent_progress' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"><div class="card-body"><div class="text-body-secondary">Recently submitted progress</div><strong class="display-6">{{ monitoring_recent_count }}</strong><div class="small">Open submissions</div></div></a></div>
+    <div class="col-sm-6 col-xl-3"><a class="card h-100 text-decoration-none" href="{% url 'incubation:staff_business_development_needs' %}"><div class="card-body"><div class="text-body-secondary">Outstanding business development needs</div><strong class="display-6">{{ monitoring_development_need_count }}</strong><div class="small">Assigned businesses only</div></div></a></div>
   </div>
   <div class="row g-4">
+    <section class="col-12"><div class="card"><div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="h5 mb-0">Outstanding business development needs</h2>
+        <a href="{% url 'incubation:staff_business_development_needs' %}">View all and record assistance</a>
+      </div>
+      <div class="table-responsive mt-3"><table class="table table-sm"><thead><tr><th>Business</th><th>Need</th><th>Identified</th><th>Status</th><th>Assigned staff</th></tr></thead><tbody>
+        {% for need in monitoring_development_needs %}<tr><td>{{ need.incubatee.legal_name }}</td><td>{{ need.get_category_display }}</td><td>{{ need.identified_at|date:"j M Y" }}</td><td>{{ need.get_status_display }}</td><td>{% if need.assigned_to %}{{ need.assigned_to.get_full_name|default:need.assigned_to.email }}{% else %}Unassigned{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="text-body-secondary">No outstanding business development needs.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </div></div></section>
     <section class="col-xl-6"><div class="card h-100"><div class="card-body">
       <h2 class="h5">Pending document reviews</h2>
       <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Business</th><th>Document</th><th>Uploaded</th></tr></thead><tbody>

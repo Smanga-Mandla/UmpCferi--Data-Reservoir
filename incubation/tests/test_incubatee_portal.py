@@ -1,4 +1,6 @@
 from datetime import date, timedelta
+from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from smtplib import SMTPException
@@ -8,9 +10,11 @@ from urllib.parse import urlsplit
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.exceptions import PermissionDenied
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from openpyxl import load_workbook
 from django.utils import timezone
 
 from accounts.models import Role
@@ -23,6 +27,8 @@ from incubation.models import (
     IncubateeBaselineSnapshot,
     IncubateeBusinessChallenge,
     IncubateeChallengeReview,
+    IncubateeBusinessDevelopmentNeed,
+    IncubateeBusinessDevelopmentNeedUpdate,
     IncubateeMetricObservation,
     IncubateeMilestone,
     IncubateeMilestoneReview,
@@ -589,6 +595,59 @@ class IncubateePortalTests(TestCase):
             1,
         )
 
+    def test_monthly_progress_records_zero_and_leaves_unknown_metrics_absent(self):
+        self.login(self.incubatee_user)
+
+        response = self.client.post(
+            reverse("incubation:progress_submit", args=(self.business.pk,)),
+            self.progress_data(
+                revenue_zar="0",
+                customer_count="",
+                full_time_employees="0",
+                part_time_employees="",
+                full_time_men="",
+                full_time_women="",
+                full_time_youth="",
+                part_time_men="",
+                part_time_women="",
+                part_time_youth="",
+                funding_received_zar="",
+            ),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        observations = IncubateeMetricObservation.objects.filter(
+            monthly_checkin__incubatee=self.business
+        )
+        self.assertEqual(
+            observations.get(
+                metric=IncubateeMetricObservation.Metric.REVENUE_ZAR
+            ).decimal_value,
+            Decimal("0"),
+        )
+        self.assertEqual(
+            observations.get(
+                metric=IncubateeMetricObservation.Metric.FULL_TIME_EMPLOYEES
+            ).integer_value,
+            0,
+        )
+        self.assertFalse(
+            observations.filter(
+                metric=IncubateeMetricObservation.Metric.CUSTOMER_COUNT
+            ).exists()
+        )
+        self.assertFalse(
+            observations.filter(
+                metric=IncubateeMetricObservation.Metric.PART_TIME_EMPLOYEES
+            ).exists()
+        )
+        self.assertFalse(
+            observations.filter(
+                metric=IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR
+            ).exists()
+        )
+
     def test_progress_validation_rejects_inconsistent_employment_and_future_period(self):
         self.login(self.incubatee_user)
         invalid_employment = self.client.post(
@@ -886,6 +945,217 @@ class IncubateePortalTests(TestCase):
         self.assertNotContains(response, "Confidential outcome")
         self.assertEqual(MentoringSession.objects.filter(incubatee=self.business).count(), 1)
 
+    def test_business_development_needs_create_multiple_records_and_link_support_requests(self):
+        self.login(self.incubatee_user)
+        invalid_evidence = self.client.post(
+            reverse(
+                "incubation:business_development_needs", args=(self.business.pk,)
+            ),
+            {
+                "categories": [IncubateeBusinessDevelopmentNeed.Category.FUNDING],
+                "description": "Need grant application support.",
+                "evidence": SimpleUploadedFile(
+                    "invalid.txt", b"unsupported", content_type="text/plain"
+                ),
+            },
+        )
+        self.assertEqual(invalid_evidence.status_code, 200)
+        self.assertFalse(
+            IncubateeBusinessDevelopmentNeed.objects.filter(
+                incubatee=self.business
+            ).exists()
+        )
+
+        response = self.client.post(
+            reverse(
+                "incubation:business_development_needs", args=(self.business.pk,)
+            ),
+            {
+                "categories": [
+                    IncubateeBusinessDevelopmentNeed.Category.FUNDING,
+                    IncubateeBusinessDevelopmentNeed.Category.MARKET_ACCESS,
+                    IncubateeBusinessDevelopmentNeed.Category.OTHER,
+                ],
+                "description": "Need help to prepare for business growth.",
+                "create_support_requests": "on",
+                "evidence": self.pdf_upload("needs.pdf"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        needs = IncubateeBusinessDevelopmentNeed.objects.filter(
+            incubatee=self.business
+        ).order_by("category")
+        self.assertEqual(needs.count(), 3)
+        self.assertEqual(
+            IncubateeBusinessDevelopmentNeedUpdate.objects.filter(
+                need__incubatee=self.business
+            ).count(),
+            3,
+        )
+        self.assertEqual(
+            IncubateeSupportRequest.objects.filter(incubatee=self.business).count(), 3
+        )
+        for need in needs:
+            self.assertEqual(need.status, IncubateeBusinessDevelopmentNeed.Status.OPEN)
+            self.assertEqual(need.description, "Need help to prepare for business growth.")
+            self.assertTrue(need.support_request_id)
+            self.assertGreater(need.evidence.size, 0)
+        self.assertEqual(
+            AuditEvent.objects.filter(
+                resource="incubation.business_development_need",
+                action=AuditEvent.Action.CREATE,
+                actor=self.incubatee_user,
+            ).count(),
+            3,
+        )
+
+        dashboard = self.client.get(reverse("incubation:incubatee_dashboard"))
+        self.assertContains(dashboard, "My Business Development Needs")
+        self.assertContains(dashboard, "3 outstanding needs")
+
+    def test_staff_can_record_assistance_and_resolve_need_with_linked_activities(self):
+        need = IncubateeBusinessDevelopmentNeed.objects.create(
+            incubatee=self.business,
+            requested_by=self.incubatee_user,
+            category=IncubateeBusinessDevelopmentNeed.Category.MENTORSHIP,
+            description="Need help with financial planning.",
+        )
+        IncubateeBusinessDevelopmentNeedUpdate.objects.create(
+            need=need,
+            status=need.status,
+            updated_by=self.incubatee_user,
+        )
+        session = MentoringSession.objects.create(
+            incubatee=self.business,
+            session_date=timezone.localdate(),
+            mentoring_hours="1.00",
+            topics="Financial planning",
+            recorded_by=self.admin,
+        )
+        interaction = Interaction.objects.create(
+            occurred_at=timezone.now(),
+            duration_minutes=60,
+            interaction_type=Interaction.Type.WORKSHOP,
+            created_by=self.admin,
+            owner=self.admin,
+            sensitivity=Interaction.Sensitivity.PUBLIC,
+        )
+        interaction.incubatees.add(self.business)
+        interaction.assigned_users.add(self.staff)
+        self.login(self.staff)
+
+        response = self.client.post(
+            reverse("incubation:staff_business_development_need_update", args=(need.pk,)),
+            {
+                "status": IncubateeBusinessDevelopmentNeed.Status.RESOLVED,
+                "assigned_to": self.staff.pk,
+                "support_provided": "Provided one-to-one financial planning mentorship.",
+                "outcome": "A cash-flow plan was completed.",
+                "resolution_date": "",
+                "mentoring_session": session.pk,
+                "interaction": interaction.pk,
+                "evidence": self.pdf_upload("assistance.pdf"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        need.refresh_from_db()
+        self.assertEqual(need.status, IncubateeBusinessDevelopmentNeed.Status.RESOLVED)
+        self.assertEqual(need.assigned_to, self.staff)
+        self.assertEqual(need.resolution_date, timezone.localdate())
+        self.assertEqual(need.updates.count(), 2)
+        update = need.updates.first()
+        self.assertEqual(update.support_provided, "Provided one-to-one financial planning mentorship.")
+        self.assertEqual(update.outcome, "A cash-flow plan was completed.")
+        self.assertEqual(update.mentoring_session, session)
+        self.assertEqual(update.interaction, interaction)
+        self.assertGreater(update.evidence.size, 0)
+        with self.assertRaises(PermissionDenied):
+            need.updates.update(outcome="Changed history")
+        with self.assertRaises(PermissionDenied):
+            need.updates.all().delete()
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                resource="incubation.business_development_need",
+                action=AuditEvent.Action.UPDATE,
+                actor=self.staff,
+            ).exists()
+        )
+
+        self.login(self.incubatee_user)
+        new_need = self.client.post(
+            reverse(
+                "incubation:business_development_needs", args=(self.business.pk,)
+            ),
+            {
+                "categories": [IncubateeBusinessDevelopmentNeed.Category.MENTORSHIP],
+                "description": "Need a follow-up session.",
+            },
+        )
+        self.assertEqual(new_need.status_code, 302)
+        self.assertEqual(
+            IncubateeBusinessDevelopmentNeed.objects.filter(
+                incubatee=self.business,
+                category=IncubateeBusinessDevelopmentNeed.Category.MENTORSHIP,
+            ).count(),
+            2,
+        )
+        need.refresh_from_db()
+        self.assertEqual(need.status, IncubateeBusinessDevelopmentNeed.Status.RESOLVED)
+        self.assertEqual(need.updates.count(), 2)
+
+        self.login(self.staff)
+        staff_dashboard = self.client.get(
+            reverse("incubation:staff_incubatee_monitoring")
+        )
+        self.assertContains(staff_dashboard, "Outstanding business development needs")
+        self.assertContains(staff_dashboard, "1</strong>")
+
+    def test_business_development_need_records_are_business_scoped_and_staff_assigned(self):
+        foreign_need = IncubateeBusinessDevelopmentNeed.objects.create(
+            incubatee=self.other_business,
+            requested_by=self.incubatee_user,
+            category=IncubateeBusinessDevelopmentNeed.Category.FUNDING,
+        )
+        self.login(self.incubatee_user)
+        foreign_portal = self.client.get(
+            reverse(
+                "incubation:business_development_needs",
+                args=(self.other_business.pk,),
+            )
+        )
+        self.assertEqual(foreign_portal.status_code, 404)
+
+        self.login(self.staff)
+        queue = self.client.get(
+            reverse("incubation:staff_business_development_needs")
+        )
+        self.assertNotContains(queue, "Other Portal Business")
+        foreign_update = self.client.post(
+            reverse(
+                "incubation:staff_business_development_need_update",
+                args=(foreign_need.pk,),
+            ),
+            {
+                "status": IncubateeBusinessDevelopmentNeed.Status.IN_PROGRESS,
+                "assigned_to": "",
+                "support_provided": "",
+                "outcome": "",
+                "resolution_date": "",
+                "mentoring_session": "",
+                "interaction": "",
+                "evidence": "",
+            },
+        )
+        self.assertEqual(foreign_update.status_code, 404)
+
+        self.login(self.incubatee_user)
+        forbidden_queue = self.client.get(
+            reverse("incubation:staff_business_development_needs")
+        )
+        self.assertEqual(forbidden_queue.status_code, 403)
+
     def test_notification_centre_uses_existing_due_dates_and_business_document_expiry(self):
         today = timezone.localdate()
         MonthlyCheckIn.objects.create(
@@ -1067,7 +1337,7 @@ class IncubateePortalTests(TestCase):
         IncubateeMilestone.objects.create(
             title="First customer",
             incubatee=self.business,
-            milestone_type=IncubateeMilestone.Type.FIRST_SALE,
+            milestone_type=IncubateeMilestone.Type.FIRST_CUSTOMER,
             milestone_date=period,
             recorded_by=self.incubatee_user,
         )
@@ -1100,12 +1370,12 @@ class IncubateePortalTests(TestCase):
 
         self.assertEqual(report.status_code, 200)
         self.assertContains(report, "4820.50")
-        self.assertContains(report, "Latest revenue")
+        self.assertContains(report, "Latest monthly revenue")
         self.assertContains(report, "Latest customers")
-        self.assertContains(report, "New customers this period")
+        self.assertContains(report, "Latest reported new customers")
         self.assertContains(report, "Employment")
-        self.assertContains(report, "Jobs created this period")
-        self.assertContains(report, "Funding received this period")
+        self.assertContains(report, "Latest reported jobs created")
+        self.assertContains(report, "Latest monthly funding received")
         self.assertContains(report, "12")
         self.assertContains(report, "4")
         self.assertContains(report, "Customers")
@@ -1136,7 +1406,7 @@ class IncubateePortalTests(TestCase):
         )
         self.assertTrue(MonthlyCheckIn.objects.filter(pk=checkin.pk).exists())
 
-    def test_my_reports_show_zero_for_unrecorded_latest_metrics(self):
+    def test_my_reports_distinguish_missing_metrics_from_recorded_zero(self):
         self.login(self.incubatee_user)
 
         report = self.client.get(
@@ -1145,8 +1415,84 @@ class IncubateePortalTests(TestCase):
 
         self.assertEqual(report.status_code, 200)
         self.assertNotContains(report, "Not recorded")
+        self.assertContains(report, "Latest monthly revenue")
+        self.assertNotContains(report, "Not provided")
+        self.assertContains(report, "—")
+        self.assertNotContains(report, "FT 0 / PT 0")
+
+    def test_report_preserves_onboarding_baseline_and_exports_numeric_funding_totals(self):
+        older_snapshot = {
+            "customer_count": 88,
+            "monthly_average_revenue_zar": "800.00",
+            "full_time_employees": 8,
+            "part_time_employees": 8,
+            "funding_received_zar": "90000.00",
+            "top_support_needs": [],
+        }
+        IncubateeBaselineSnapshot.objects.create(
+            incubatee=self.business,
+            snapshot=older_snapshot,
+            source="manual",
+            changed_by=self.admin,
+        )
+        IncubateeBaselineSnapshot.objects.create(
+            incubatee=self.business,
+            snapshot={
+                "business_stage": Incubatee.BusinessStage.IDEA,
+                "business_registration_status": Incubatee.RegistrationStatus.NOT_REGISTERED,
+                "customer_count": 0,
+                "monthly_average_revenue_zar": "0.00",
+                "full_time_employees": 0,
+                "part_time_employees": 0,
+                "funding_received_zar": "1000.00",
+                "top_support_needs": [],
+            },
+            source="initial_onboarding_baseline",
+            changed_by=self.admin,
+        )
+        period = date.today().replace(day=1)
+        for metric, value in (
+            (IncubateeMetricObservation.Metric.REVENUE_ZAR, {"decimal_value": "0.00"}),
+            (IncubateeMetricObservation.Metric.CUSTOMER_COUNT, {"integer_value": 4}),
+            (IncubateeMetricObservation.Metric.FULL_TIME_EMPLOYEES, {"integer_value": 1}),
+            (IncubateeMetricObservation.Metric.PART_TIME_EMPLOYEES, {"integer_value": 2}),
+            (IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR, {"decimal_value": "2500.00"}),
+        ):
+            IncubateeMetricObservation.objects.create(
+                incubatee=self.business,
+                period_type=IncubateeMetricObservation.PeriodType.MONTHLY,
+                period_start=period,
+                metric=metric,
+                source="test",
+                **value,
+            )
+        self.login(self.incubatee_user)
+
+        report = self.client.get(
+            reverse("incubation:incubatee_reports", args=(self.business.pk,))
+        )
+        excel = self.client.get(
+            reverse(
+                "incubation:incubatee_report_export",
+                args=(self.business.pk, "xlsx"),
+            )
+        )
+
+        self.assertEqual(report.status_code, 200)
+        self.assertEqual(report.context["baseline_metrics"]["customer_count"], 0)
+        self.assertEqual(report.context["latest_values"]["customer_count"], 4)
+        self.assertEqual(report.context["cumulative_funding"], Decimal("3500.00"))
         self.assertContains(report, "R 0.00")
-        self.assertContains(report, "FT 0 / PT 0")
+        workbook = load_workbook(BytesIO(excel.content), read_only=True, data_only=True)
+        summary = {
+            row[0]: row[1]
+            for row in workbook["Business summary"].iter_rows(
+                min_row=2, values_only=True
+            )
+        }
+        self.assertEqual(summary["Initial customers"], 0)
+        self.assertEqual(summary["Latest customers"], 4)
+        self.assertEqual(summary["Reported cumulative funding (ZAR)"], 3500)
 
     def test_staff_monitoring_and_incubatee_profile_use_authorized_business_scope(self):
         period = date.today().replace(day=1)
@@ -1200,11 +1546,116 @@ class IncubateePortalTests(TestCase):
             ).exists()
         )
 
+    def test_staff_impact_summary_uses_latest_stocks_and_selected_month_funding_flow(self):
+        current_period = date.today().replace(day=1)
+        previous_period = (current_period - timedelta(days=1)).replace(day=1)
+        self.business.status = Incubatee.Status.ACTIVE
+        self.business.business_stage = Incubatee.BusinessStage.IDEA
+        self.business.business_registration_status = (
+            Incubatee.RegistrationStatus.NOT_REGISTERED
+        )
+        self.business.save(
+            update_fields=(
+                "status",
+                "business_stage",
+                "business_registration_status",
+                "updated_at",
+            )
+        )
+        IncubateeBaselineSnapshot.objects.create(
+            incubatee=self.business,
+            snapshot={
+                "full_time_employees": 2,
+                "part_time_employees": 1,
+            },
+            source="staff_incubatee_registration",
+            changed_by=self.admin,
+        )
+        observations = (
+            (
+                previous_period,
+                IncubateeMetricObservation.Metric.CUSTOMER_COUNT,
+                {"integer_value": 5},
+            ),
+            (
+                previous_period,
+                IncubateeMetricObservation.Metric.FULL_TIME_EMPLOYEES,
+                {"integer_value": 2},
+            ),
+            (
+                previous_period,
+                IncubateeMetricObservation.Metric.PART_TIME_EMPLOYEES,
+                {"integer_value": 1},
+            ),
+            (
+                previous_period,
+                IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR,
+                {"decimal_value": "900.00"},
+            ),
+            (
+                current_period,
+                IncubateeMetricObservation.Metric.CUSTOMER_COUNT,
+                {"integer_value": 9},
+            ),
+            (
+                current_period,
+                IncubateeMetricObservation.Metric.FULL_TIME_EMPLOYEES,
+                {"integer_value": 3},
+            ),
+            (
+                current_period,
+                IncubateeMetricObservation.Metric.PART_TIME_EMPLOYEES,
+                {"integer_value": 2},
+            ),
+            (
+                current_period,
+                IncubateeMetricObservation.Metric.FUNDING_RECEIVED_ZAR,
+                {"decimal_value": "100.00"},
+            ),
+        )
+        for observation_period, metric, value in observations:
+            IncubateeMetricObservation.objects.create(
+                incubatee=self.business,
+                period_type=IncubateeMetricObservation.PeriodType.MONTHLY,
+                period_start=observation_period,
+                metric=metric,
+                source="test",
+                **value,
+            )
+        MonthlyCheckIn.objects.create(
+            incubatee=self.business,
+            period_start=current_period,
+            submitted_at=timezone.now(),
+            submitted_by=self.incubatee_user,
+        )
+        MentoringSession.objects.create(
+            incubatee=self.business,
+            session_date=current_period,
+            mentoring_hours=Decimal("1.50"),
+            topics="Synthetic planning session",
+            recorded_by=self.staff,
+        )
+        self.login(self.staff)
+
+        response = self.client.get(
+            reverse("incubation:staff_incubatee_monitoring"),
+            {"reporting_period": current_period.strftime("%Y-%m")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["monitoring_total_customers"], 9)
+        self.assertEqual(response.context["monitoring_customer_business_count"], 1)
+        self.assertEqual(response.context["monitoring_employment_change"], 2)
+        self.assertEqual(response.context["monitoring_funding_total"], Decimal("100.00"))
+        self.assertEqual(response.context["monitoring_progress_completion_rate"], 100)
+        self.assertEqual(response.context["monitoring_mentoring_session_count"], 1)
+
     def test_incubatee_onboarding_and_reporting_journey_end_to_end(self):
         self.login(self.staff)
         registration = self.client.post(
             reverse("incubation:account_create"),
             {
+                "registration_mode": "existing_business",
                 "full_name": "Journey Representative",
                 "email": "journey.rep@gmail.com",
                 "businesses": [str(self.business.pk)],

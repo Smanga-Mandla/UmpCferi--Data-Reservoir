@@ -3,34 +3,82 @@
 {% block content %}
 <section class="container py-4">
   <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
       <div class="card">
         <div class="card-body p-4">
           <h1 class="h3">{{ title }}</h1>
-          <p class="text-body-secondary">This creates an account only and links it to existing business record(s). It does not create or duplicate SME records.</p>
-          {% if not has_manageable_businesses %}
-            <div class="alert alert-warning" role="status">
-              You cannot register an invitation yet because no businesses are assigned to your authorized scope. Ask an administrator to assign the existing business to you first.
-            </div>
-          {% endif %}
-          <div class="alert alert-info">The account will receive a secure password-setup link that expires after 30 minutes. No password is sent by email. Contact number is omitted pending CFERI approval.</div>
-          <form method="post">
+          <p class="text-body-secondary">Register an entrepreneur and connect their account to one or more businesses. New idea-stage businesses do not need formal registration details.</p>
+          <div class="alert alert-info">The account receives a secure password-setup link that expires after 30 minutes. No password is sent by email. Phone number is not collected pending CFERI approval.</div>
+          <form method="post" id="incubatee-registration-form">
             {% csrf_token %}
-            {% for field in form %}
-              <div class="mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-                {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            {% if business_query %}<input type="hidden" name="business_q" value="{{ business_query }}">{% endif %}
+            <div class="mb-3">
+              <label class="form-label">{{ form.registration_mode.label }}</label>
+              {{ form.registration_mode }}
+              {% for error in form.registration_mode.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="row g-3">
+              {% for field in form %}
+                {% if field.name == "full_name" or field.name == "email" or field.name == "entrepreneur_category" or field.name == "account_status" %}
+                  <div class="col-md-6">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+            <section class="mt-4" data-registration-fields="existing_business" {% if form.registration_mode.value != "existing_business" %}hidden{% endif %}>
+              <h2 class="h5">Link to existing business</h2>
+              <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-8">
+                  <label class="form-label" for="business-search">Search existing businesses</label>
+                  <input class="form-control" type="search" id="business-search" name="business_q" value="{{ business_query }}" form="business-search-form">
+                </div>
+                <div class="col-auto">
+                  <button class="btn btn-outline-primary" type="submit" form="business-search-form">Search</button>
+                </div>
               </div>
-            {% endfor %}
-            {% for error in form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
-            <button class="btn btn-primary" type="submit">Create account and send invitation</button>
-            <a class="btn btn-outline-secondary" href="{% url 'incubation:account_list' %}">Cancel</a>
+              <label class="form-label" for="{{ form.businesses.id_for_label }}">{{ form.businesses.label }}</label>
+              {{ form.businesses }}
+              {% if form.businesses.help_text %}<div class="form-text">{{ form.businesses.help_text }}</div>{% endif %}
+              {% for error in form.businesses.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+            </section>
+            <section class="mt-4" data-registration-fields="new_business" {% if form.registration_mode.value != "new_business" %}hidden{% endif %}>
+              <h2 class="h5">Register new business</h2>
+              <p class="small text-body-secondary">CIPC number and formal registration date are optional. Do not enter founder identity or other sensitive information here.</p>
+              <div class="row g-3">
+                {% for field in form %}
+                  {% if field.name == "new_business_name" or field.name == "business_description" or field.name == "business_registration_status" or field.name == "cipc_registration_number" or field.name == "date_registered" or field.name == "business_stage" or field.name == "programme" or field.name == "assigned_staff" or field.name == "initial_support_needs" %}
+                    <div class="{% if field.name == 'business_description' or field.name == 'initial_support_needs' %}col-12{% else %}col-md-6{% endif %}">
+                      <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                      {{ field }}
+                      {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </section>
+            <div class="mt-4">
+              <button class="btn btn-primary" type="submit">Create account and send invitation</button>
+              <a class="btn btn-outline-secondary" href="{% url 'incubation:account_list' %}">Cancel</a>
+            </div>
+          </form>
+          <form method="get" id="business-search-form" class="d-none">
+            {% if form.registration_mode.value %}<input type="hidden" name="registration_mode" value="{{ form.registration_mode.value }}">{% endif %}
           </form>
         </div>
       </div>
     </div>
   </div>
 </section>
+<script>
+  document.querySelectorAll('input[name="registration_mode"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      document.querySelectorAll("[data-registration-fields]").forEach((section) => {
+        section.hidden = section.dataset.registrationFields !== input.value;
+      });
+    });
+  });
+</script>
 {% endblock %}

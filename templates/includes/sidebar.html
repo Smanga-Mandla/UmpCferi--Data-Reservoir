@@ -9,6 +9,7 @@
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:milestone_list' business.pk %}">Business Milestones</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:challenge_list' business.pk %}">Challenges</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:support_request_list' business.pk %}">Support Requests</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:business_development_needs' business.pk %}">My Business Development Needs</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:mentorship_portal' business.pk %}">My Mentorship</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:notification_centre' business.pk %}">Notifications</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:incubatee_reports' business.pk %}">Business Performance &amp; Reports</a>
@@ -44,6 +45,7 @@
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:business_document_review_list' %}">Business document reviews</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:progress_review_list' %}">Progress, milestone and challenge reviews</a>
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:support_request_review_list' %}">Support request reviews</a>
+        <a class="list-group-item list-group-item-action" href="{% url 'incubation:staff_business_development_needs' %}">Business Development Needs</a>
       {% endif %}
       {% if is_cferi_staff %}
         <a class="list-group-item list-group-item-action" href="{% url 'incubation:staff_incubatee_monitoring' %}">Incubatee Monitoring</a>

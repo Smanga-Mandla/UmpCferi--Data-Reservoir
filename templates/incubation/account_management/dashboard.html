@@ -6,7 +6,6 @@
     <div>
       <p class="text-body-secondary mb-1">Incubatee workspace</p>
       <h1 class="h2">Welcome{% if user.first_name %}, {{ user.first_name }}{% endif %}</h1>
-      <p class="text-body-secondary mb-0">Your dashboard shows only businesses explicitly linked to your account.</p>
     </div>
     {% if businesses %}
       <form method="get" class="d-flex align-items-end gap-2">
@@ -35,6 +34,27 @@
           </div>
           <span class="badge text-bg-primary">{{ business.get_status_display }}</span>
         </div>
+      </div>
+    </section>
+    <section class="card mb-4" aria-labelledby="development-needs-heading">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <h2 class="h4 mb-1" id="development-needs-heading">My Business Development Needs</h2>
+            <p class="text-body-secondary mb-0">{{ outstanding_business_development_need_count }} outstanding need{{ outstanding_business_development_need_count|pluralize }}</p>
+          </div>
+          <a class="btn btn-outline-primary" href="{% url 'incubation:business_development_needs' business.pk %}">View and update needs</a>
+        </div>
+        <ul class="list-group list-group-flush mt-3">
+          {% for need in outstanding_business_development_needs|slice:":5" %}
+            <li class="list-group-item px-0 d-flex flex-wrap justify-content-between gap-2">
+              <span>{{ need.get_category_display }}</span>
+              <span class="badge text-bg-secondary">{{ need.get_status_display }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-body-secondary">No outstanding business development needs.</li>
+          {% endfor %}
+        </ul>
       </div>
     </section>
   {% endif %}

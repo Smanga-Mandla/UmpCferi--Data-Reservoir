@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.forms import UserPasswordResetForm
-from accounts.models import Role, RoleGrant
+from accounts.models import Role
 from audit.models import AuditEvent
 from audit.services import log_event
 from incubation.account_access import (
@@ -19,7 +19,14 @@ from incubation.account_access import (
     manageable_account_businesses,
 )
 from incubation.account_forms import IncubateeAccountForm, IncubateeAccountSearchForm
-from incubation.models import IncubateeAccount, IncubateeAccountBusiness
+from incubation.baselines import capture_incubatee_baseline
+from incubation.models import (
+    Incubatee,
+    IncubateeAccount,
+    IncubateeAccountBusiness,
+    IncubateeBaselineSnapshot,
+    IncubateeStatusHistory,
+)
 
 User = get_user_model()
 
@@ -74,7 +81,7 @@ def incubatee_account_list(request):
             "account_rows": account_rows,
             "search_form": form,
             "search_query": form.cleaned_data.get("q", "") if form.is_valid() else "",
-            "can_add_account": businesses.exists(),
+            "can_add_account": True,
             "has_manageable_businesses": businesses.exists(),
         },
     )
@@ -86,12 +93,35 @@ def incubatee_account_create(request):
     form = IncubateeAccountForm(
         request.POST or None,
         business_queryset=businesses,
+        business_query=request.GET.get("business_q", ""),
+        actor=request.user,
     )
     if request.method == "POST" and form.is_valid():
         data = form.cleaned_data
         full_name_parts = data["full_name"].split(maxsplit=1)
         first_name, last_name = full_name_parts[0], full_name_parts[1]
         with transaction.atomic():
+            if (
+                data["registration_mode"]
+                == IncubateeAccountForm.RegistrationMode.NEW_BUSINESS
+                and Incubatee.all_objects.filter(
+                    Q(legal_name__iexact=data["new_business_name"])
+                    | Q(trading_name__iexact=data["new_business_name"])
+                ).exists()
+            ):
+                form.add_error(
+                    "new_business_name",
+                    "A business with this name already exists. Search for and link the existing business.",
+                )
+                return render(
+                    request,
+                    "incubation/account_management/form.html",
+                    {
+                        "form": form,
+                        "title": "Add incubatee",
+                        "business_query": request.POST.get("business_q", ""),
+                    },
+                )
             user = User.objects.create_user(
                 email=data["email"],
                 password=secrets.token_urlsafe(48),
@@ -104,16 +134,83 @@ def incubatee_account_create(request):
                 entrepreneur_category=data["entrepreneur_category"],
                 created_by=request.user,
             )
-            IncubateeAccountBusiness.objects.bulk_create(
-                [
-                    IncubateeAccountBusiness(
-                        account=account,
-                        incubatee=business,
-                        linked_by=request.user,
-                    )
-                    for business in data["businesses"]
+            if (
+                data["registration_mode"]
+                == IncubateeAccountForm.RegistrationMode.NEW_BUSINESS
+            ):
+                business = Incubatee.objects.create(
+                    legal_name=data["new_business_name"],
+                    products_services=data["business_description"].strip(),
+                    business_registration_status=data["business_registration_status"],
+                    cipc_registration_number=data["cipc_registration_number"],
+                    date_registered=data["date_registered"],
+                    business_stage=data["business_stage"],
+                    programme=data["programme"],
+                    staff_owner=data["assigned_staff"],
+                    top_support_needs=(
+                        [data["initial_support_needs"].strip()]
+                        if data["initial_support_needs"].strip()
+                        else []
+                    ),
+                    status=Incubatee.Status.APPLICANT,
+                    created_by=request.user,
+                    updated_by=request.user,
+                    owner=request.user,
+                    source="staff_incubatee_registration",
+                )
+                business.assigned_users.add(data["assigned_staff"])
+                IncubateeStatusHistory.objects.create(
+                    incubatee=business,
+                    old_status="",
+                    new_status=business.status,
+                    changed_by=request.user,
+                )
+                IncubateeAccountBusiness.objects.create(
+                    account=account,
+                    incubatee=business,
+                    linked_by=request.user,
+                )
+                capture_incubatee_baseline(
+                    business,
+                    request.user,
+                    source="staff_incubatee_registration",
+                )
+                business_ids = [str(business.pk)]
+                log_event(
+                    actor=request.user,
+                    action=AuditEvent.Action.CREATE,
+                    target=business,
+                    resource="incubation.incubatee",
+                    metadata={
+                        "source": "staff_incubatee_registration",
+                        "registration_status": business.business_registration_status,
+                        "business_stage": business.business_stage,
+                    },
+                    request=request,
+                )
+            else:
+                IncubateeAccountBusiness.objects.bulk_create(
+                    [
+                        IncubateeAccountBusiness(
+                            account=account,
+                            incubatee=business,
+                            linked_by=request.user,
+                        )
+                        for business in data["businesses"]
+                    ]
+                )
+                for business in data["businesses"]:
+                    if not IncubateeBaselineSnapshot.objects.filter(
+                        incubatee=business
+                    ).exists():
+                        capture_incubatee_baseline(
+                            business,
+                            request.user,
+                            source="staff_existing_business_link",
+                        )
+                business_ids = [
+                    str(business.pk) for business in data["businesses"]
                 ]
-            )
             reset_form = UserPasswordResetForm({"email": user.email})
             if not reset_form.is_valid():
                 raise RuntimeError("The account activation email could not be prepared.")
@@ -136,7 +233,8 @@ def incubatee_account_create(request):
                 resource="incubation.incubatee_account",
                 metadata={
                     "entrepreneur_category": account.entrepreneur_category,
-                    "business_ids": [str(business.pk) for business in data["businesses"]],
+                    "registration_mode": data["registration_mode"],
+                    "business_ids": business_ids,
                     "status": data["account_status"],
                     "invitation_sent": True,
                 },
@@ -152,8 +250,8 @@ def incubatee_account_create(request):
         "incubation/account_management/form.html",
         {
             "form": form,
-            "title": "Add incubatee account",
-            "has_manageable_businesses": businesses.exists(),
+            "title": "Add incubatee",
+            "business_query": request.GET.get("business_q", ""),
         },
     )
 

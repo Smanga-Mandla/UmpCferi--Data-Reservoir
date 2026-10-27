@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}My Business Development Needs | UMP CFERI{% endblock %}
+{% block content %}
+<main class="container-fluid py-4">
+  <div class="mb-4">
+    <p class="text-body-secondary mb-1">Business development</p>
+    <h1 class="h2 mb-1">My Business Development Needs</h1>
+    <p class="text-body-secondary mb-0">{{ business.legal_name }}</p>
+  </div>
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Tell CFERI what support you need</h2>
+      <p class="text-body-secondary">Select each area where you would like support. You can add details below.</p>
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        {% for field in form %}
+          <div class="mb-4">
+            {% if field.name == "categories" %}
+              <fieldset>
+                <legend class="form-label fw-semibold">{{ field.label }}</legend>
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-2">
+                  {% for choice in field %}
+                    <div class="col">
+                      <div class="form-check border rounded p-3 h-100">
+                        {{ choice.tag }}
+                        <label class="form-check-label ms-1" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+                {% for error in field.errors %}<div class="small text-danger mt-2">{{ error }}</div>{% endfor %}
+              </fieldset>
+            {% elif field.field.widget.input_type == "checkbox" %}
+              <div class="form-check border rounded p-3">
+                {{ field }}
+                <label class="form-check-label ms-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              </div>
+            {% else %}
+              <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+            {% endif %}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% if field.name != "categories" %}{% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}{% endif %}
+          </div>
+        {% endfor %}
+        <button class="btn btn-primary" type="submit">Save my needs</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-body">
+      <h2 class="h5">Your identified needs and CFERI support</h2>
+      {% for need in needs %}
+        <article class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+              <div>
+                <p class="small text-body-secondary mb-1">Need identified {{ need.identified_at|date:"j M Y" }}</p>
+                <h3 class="h6 mb-0">{{ need.get_category_display }}</h3>
+              </div>
+              <span class="badge text-bg-secondary">{{ need.get_status_display }}</span>
+            </div>
+            {% if need.description %}<p class="mt-3 mb-2">{{ need.description|linebreaksbr }}</p>{% endif %}
+            {% if need.assigned_to or need.resolution_date %}
+              <p class="small text-body-secondary mb-2">{% if need.assigned_to %}Assigned to {{ need.assigned_to.get_full_name|default:need.assigned_to.email }}{% endif %}{% if need.assigned_to and need.resolution_date %} · {% endif %}{% if need.resolution_date %}Resolved {{ need.resolution_date|date:"j M Y" }}{% endif %}</p>
+            {% endif %}
+            <div class="d-flex flex-wrap gap-3 small">
+              {% if need.evidence %}<a href="{% url 'incubation:business_development_need_evidence_download' business.pk need.pk %}">Download supporting evidence</a>{% endif %}
+              {% if need.support_request_id %}<a href="{% url 'incubation:support_request_list' business.pk %}">View linked support request</a>{% endif %}
+            </div>
+            <h4 class="small fw-semibold mt-4 mb-2">Support history</h4>
+            <div class="border-start ps-3">
+              {% for update in need.updates.all %}
+                <div class="mb-3{% if forloop.last %} mb-0{% endif %}">
+                  <div class="d-flex flex-wrap gap-2 align-items-baseline">
+                    <strong>{{ update.get_status_display }}</strong>
+                    <span class="small text-body-secondary">{{ update.created_at|date:"j M Y, H:i" }}</span>
+                    {% if update.updated_by == user %}<span class="small text-body-secondary">Submitted by you</span>{% endif %}
+                  </div>
+                  {% if update.assigned_to %}<p class="small text-body-secondary mb-1">Assigned to {{ update.assigned_to.get_full_name|default:update.assigned_to.email }}</p>{% endif %}
+                  {% if update.support_provided %}<p class="mb-1"><strong>Assistance provided:</strong> {{ update.support_provided|linebreaksbr }}</p>{% endif %}
+                  {% if update.outcome %}<p class="mb-1"><strong>Outcome:</strong> {{ update.outcome|linebreaksbr }}</p>{% endif %}
+                  {% if update.mentoring_session %}<p class="small mb-1">Linked mentoring session: {{ update.mentoring_session.session_date|date:"j M Y" }}</p>{% endif %}
+                  {% if update.interaction %}<p class="small mb-1">Linked activity: {{ update.interaction.get_interaction_type_display }} · {{ update.interaction.occurred_at|date:"j M Y" }}</p>{% endif %}
+                  {% if update.evidence %}<a class="small" href="{% url 'incubation:business_development_need_update_evidence_download' business.pk need.pk update.pk %}">Download assistance evidence</a>{% endif %}
+                </div>
+              {% empty %}<p class="small text-body-secondary mb-0">No updates yet.</p>{% endfor %}
+            </div>
+          </div>
+        </article>
+      {% empty %}<p class="text-body-secondary mb-0">You have not identified any business development needs yet.</p>{% endfor %}
+    </div>
+  </section>
+</main>
+{% endblock %}

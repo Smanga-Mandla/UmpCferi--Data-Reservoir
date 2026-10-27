@@ -1,9 +1,31 @@
-from accounts.models import Role, RoleGrant
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.utils import timezone
+
 from accounts.access import accessible_queryset
+from accounts.models import Role, RoleGrant
+
 from incubation.models import Incubatee
 
 
 MANAGEMENT_ROLES = {Role.Code.ADMIN, Role.Code.CFERI_STAFF}
+User = get_user_model()
+
+
+def assignable_cferi_staff():
+    """Return all active, non-expired CFERI Staff accounts eligible for assignment."""
+    return (
+        User.objects.filter(
+            is_active=True,
+            roles__code=Role.Code.CFERI_STAFF,
+        )
+        .filter(
+            Q(access_expires_at__isnull=True)
+            | Q(access_expires_at__gt=timezone.now())
+        )
+        .distinct()
+        .order_by("email")
+    )
 
 
 def can_manage_incubatee_accounts(user):

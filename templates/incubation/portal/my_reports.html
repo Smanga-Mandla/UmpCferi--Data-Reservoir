@@ -1,52 +1,89 @@
 {% extends "base.html" %}
 {% block title %}My Reports | UMP CFERI{% endblock %}
+{% block extra_head %}
+<style>
+  .business-report { min-width: 0; }
+  .business-report .report-chart { position: relative; height: 260px; }
+  .business-report .report-table th,
+  .business-report .report-table td { white-space: nowrap; }
+</style>
+{% endblock %}
 {% block content %}
-<main class="container-fluid py-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
-    <div>
-      <p class="text-body-secondary mb-1">Incubatee reports</p>
-      <h1 class="h2 mb-1">My Reports</h1>
-      <p class="text-body-secondary mb-0">{{ business.legal_name }}</p>
+<div class="container-fluid py-4 business-report">
+  <header class="card border-0 shadow-sm mb-4">
+    <div class="card-body d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div>
+        <p class="text-body-secondary mb-1">Incubatee reports</p>
+        <h1 class="h2 mb-1">Incubatee Business Development Report</h1>
+        <p class="text-body-secondary mb-0">{{ business.legal_name }}</p>
+        {% if account_categories %}<p class="small text-body-secondary mb-0 mt-1">Entrepreneur category: {{ account_categories|join:", " }}</p>{% endif %}
+      </div>
+      <nav class="d-flex flex-wrap gap-2" aria-label="Report actions">
+        <a class="btn btn-outline-success" href="{% url 'incubation:incubatee_report_export' business.pk 'xlsx' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export Excel</a>
+        <a class="btn btn-outline-danger" href="{% url 'incubation:incubatee_report_export' business.pk 'pdf' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export PDF</a>
+        <a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_dashboard' %}?business={{ business.pk }}">Back to dashboard</a>
+      </nav>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-      <a class="btn btn-outline-success" href="{% url 'incubation:incubatee_report_export' business.pk 'xlsx' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export Excel</a>
-      <a class="btn btn-outline-danger" href="{% url 'incubation:incubatee_report_export' business.pk 'pdf' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export PDF</a>
-      <a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_dashboard' %}?business={{ business.pk }}">Back to dashboard</a>
+  </header>
+  <form method="get" class="card card-body mb-4">
+    <div class="row g-3 align-items-end">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="period-start">From</label>
+        <input class="form-control" type="date" id="period-start" name="period_start" value="{{ period_start }}">
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label" for="period-end">To</label>
+        <input class="form-control" type="date" id="period-end" name="period_end" value="{{ period_end }}">
+      </div>
+      <div class="col-auto"><button class="btn btn-primary" type="submit">Apply period</button></div>
+      <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_reports' business.pk %}">Clear</a></div>
     </div>
-  </div>
-  <form method="get" class="row g-2 align-items-end mb-4">
-    <div class="col-sm-4 col-lg-3">
-      <label class="form-label" for="period-start">From</label>
-      <input class="form-control" type="date" id="period-start" name="period_start" value="{{ period_start }}">
-    </div>
-    <div class="col-sm-4 col-lg-3">
-      <label class="form-label" for="period-end">To</label>
-      <input class="form-control" type="date" id="period-end" name="period_end" value="{{ period_end }}">
-    </div>
-    <div class="col-auto"><button class="btn btn-primary" type="submit">Apply period</button></div>
-    <div class="col-auto"><a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_reports' business.pk %}">Clear</a></div>
   </form>
 
+  <section class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">Business and onboarding baseline</h2>
+      <div class="row g-3 mb-3">
+        <div class="col-md-4"><strong>Programme:</strong> {{ business.programme.name|default:"—" }}</div>
+        <div class="col-md-4"><strong>Date joined CFERI:</strong> {{ date_joined_cferi|date:"j M Y" }}</div>
+        <div class="col-md-4"><strong>Current business stage:</strong> {{ current_business_stage|default:"—" }}</div>
+      </div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>Baseline measure</th><th>Value at registration</th></tr></thead>
+        <tbody>
+          {% for label,value in baseline_rows %}
+            <tr><th>{{ label }}</th><td>{% if value is not None and value != "" %}{{ value }}{% else %}—{% endif %}</td></tr>
+          {% endfor %}
+          <tr><th>Initial entrepreneur category</th><td>{% if account_categories %}{{ account_categories|join:", " }}{% else %}—{% endif %}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </section>
+
   <section class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4" aria-label="Latest business performance">
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest revenue</h2><p class="h4 mb-0">R {{ latest_values.revenue_zar|default:"0"|floatformat:2 }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest customers</h2><p class="h4 mb-0">{{ latest_values.customer_count|default:"0" }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">New customers this period</h2><p class="h4 mb-0">{{ latest_values.new_customers|default:"0" }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Employment</h2><p class="h4 mb-0">FT {{ latest_values.full_time_employees|default:"0" }} / PT {{ latest_values.part_time_employees|default:"0" }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Jobs created this period</h2><p class="h4 mb-0">{{ latest_values.jobs_created|default:"0" }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Jobs lost this period</h2><p class="h4 mb-0">{{ latest_values.jobs_lost|default:"0" }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Funding applied for</h2><p class="h4 mb-0">R {{ latest_values.funding_applied_zar|default:"0"|floatformat:2 }}</p></div></article></div>
-    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Funding received this period</h2><p class="h4 mb-0">R {{ latest_values.funding_received_zar|default:"0"|floatformat:2 }}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest monthly revenue</h2><p class="h4 mb-0">{% if latest_values.revenue_zar is not None %}R {{ latest_values.revenue_zar|floatformat:2 }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest customers</h2><p class="h4 mb-0">{% if latest_values.customer_count is not None %}{{ latest_values.customer_count }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest reported new customers</h2><p class="h4 mb-0">{% if latest_values.new_customers is not None %}{{ latest_values.new_customers }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Employment</h2><p class="h4 mb-0">FT {{ latest_values.full_time_employees|default_if_none:"—" }} / PT {{ latest_values.part_time_employees|default_if_none:"—" }}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest reported jobs created</h2><p class="h4 mb-0">{% if latest_values.jobs_created is not None %}{{ latest_values.jobs_created }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest reported jobs lost</h2><p class="h4 mb-0">{% if latest_values.jobs_lost is not None %}{{ latest_values.jobs_lost }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Funding applied for</h2><p class="h4 mb-0">{% if latest_values.funding_applied_zar is not None %}R {{ latest_values.funding_applied_zar|floatformat:2 }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Latest monthly funding received</h2><p class="h4 mb-0">{% if latest_values.funding_received_zar is not None %}R {{ latest_values.funding_received_zar|floatformat:2 }}{% else %}—{% endif %}</p></div></article></div>
+    <div class="col"><article class="card h-100"><div class="card-body"><h2 class="h6 text-body-secondary">Reported cumulative funding</h2><p class="h4 mb-0">{% if cumulative_funding is not None %}R {{ cumulative_funding|floatformat:2 }}{% else %}—{% endif %}</p><small>{% if cumulative_funding is None %}No funding baseline or monthly receipts are recorded.{% elif cumulative_funding_partial %}Initial funding baseline was not captured; this is a monthly reported subtotal.{% else %}Initial reported funding plus monthly reported receipts.{% endif %}</small></div></article></div>
   </section>
 
   <section class="card mb-4">
     <div class="card-body">
       <h2 class="h5">Business performance trends</h2>
       {% if trend_rows %}
-        <div class="ratio" style="--bs-aspect-ratio: 40%">
-          <canvas id="businessPerformanceChart" role="img" aria-label="Monthly business performance trends"></canvas>
+        <div class="row g-3 mb-3">
+          <div class="col-xl-6"><div class="border rounded p-3 h-100"><h3 class="h6">Monthly revenue (ZAR)</h3><div class="report-chart"><canvas id="revenueChart" role="img" aria-label="Monthly revenue"></canvas></div></div></div>
+          <div class="col-xl-6"><div class="border rounded p-3 h-100"><h3 class="h6">Customer growth</h3><div class="report-chart"><canvas id="customerChart" role="img" aria-label="Reported customer counts"></canvas></div></div></div>
+          <div class="col-xl-6"><div class="border rounded p-3 h-100"><h3 class="h6">Employment changes</h3><div class="report-chart"><canvas id="employmentChart" role="img" aria-label="Reported full-time and part-time employment counts"></canvas></div></div></div>
+          <div class="col-xl-6"><div class="border rounded p-3 h-100"><h3 class="h6">Funding received (ZAR)</h3><div class="report-chart"><canvas id="fundingChart" role="img" aria-label="Monthly funding receipts"></canvas></div></div></div>
         </div>
         <div class="table-responsive mt-3">
-          <table class="table table-sm table-striped align-middle">
+          <table class="table table-sm table-striped align-middle report-table">
             <thead>
               <tr>
                 <th scope="col">Reporting period</th>
@@ -65,6 +102,9 @@
                 <th scope="col">Jobs lost</th>
                 <th scope="col">Funding applied for (ZAR)</th>
                 <th scope="col">Funding received this period (ZAR)</th>
+                <th scope="col">Funding source</th>
+                <th scope="col">Business stage</th>
+                <th scope="col">Support needed</th>
               </tr>
             </thead>
             <tbody>
@@ -86,6 +126,9 @@
                   <td>{{ row.values.jobs_lost|default_if_none:"—" }}</td>
                   <td>{{ row.values.funding_applied_zar|default_if_none:"—" }}</td>
                   <td>{{ row.values.funding_received_zar|default_if_none:"—" }}</td>
+                  <td>{{ row.values.funding_source|default_if_none:"—" }}</td>
+                  <td>{{ row.values.business_stage|default_if_none:"—" }}</td>
+                  <td>{{ row.values.support_needed|default_if_none:"—" }}</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -102,9 +145,20 @@
       <div class="card h-100"><div class="card-body">
         <h2 class="h5">Progress submission history</h2>
         <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Reporting period</th><th>Submitted</th><th>Completeness</th><th>Status</th></tr></thead><tbody>
-          {% for checkin in progress_history %}
-            <tr><td>{{ checkin.period_start|date:"F Y" }}</td><td>{{ checkin.submitted_at|date:"j M Y, H:i" }}</td><td>{% if checkin.completeness_score is not None %}{{ checkin.completeness_score }}%{% else %}—{% endif %}</td><td>{% if checkin.portal_submission %}{{ checkin.portal_submission.review_status|title }}{% else %}Submitted{% endif %}</td></tr>
-          {% empty %}<tr><td colspan="4" class="text-body-secondary">No progress submissions yet.</td></tr>{% endfor %}
+          {% for row in progress_detail_rows %}
+            <tr><td>{{ row.checkin.period_start|date:"F Y" }}</td><td>{{ row.checkin.submitted_at|date:"j M Y, H:i" }}</td><td>{% if row.checkin.completeness_score is not None %}{{ row.checkin.completeness_score }}%{% else %}—{% endif %}</td><td>{% if row.submission %}{{ row.submission.review_status_display }}{% else %}Submitted{% endif %}</td></tr>
+            <tr><td colspan="4"><div class="row g-2 small">
+              <div class="col-md-4"><strong>Revenue:</strong> {% if row.metrics.revenue_zar is not None %}R {{ row.metrics.revenue_zar|floatformat:2 }}{% else %}—{% endif %}</div>
+              <div class="col-md-4"><strong>Customers:</strong> {{ row.metrics.customer_count|default_if_none:"—" }}</div>
+              <div class="col-md-4"><strong>Employees:</strong> FT {{ row.metrics.full_time_employees|default_if_none:"—" }} / PT {{ row.metrics.part_time_employees|default_if_none:"—" }}</div>
+              <div class="col-md-4"><strong>Funding received:</strong> {% if row.metrics.funding_received_zar is not None %}R {{ row.metrics.funding_received_zar|floatformat:2 }}{% else %}—{% endif %}</div>
+              <div class="col-md-4"><strong>Funding source:</strong> {{ row.metrics.funding_source|default:"—" }}</div>
+              <div class="col-md-4"><strong>Business stage:</strong> {{ row.metrics.business_stage|default:"—" }}</div>
+              <div class="col-12"><strong>Achievements:</strong> {% if row.submission %}{{ row.submission.business_achievements|default:"—" }}{% else %}—{% endif %}</div>
+              <div class="col-12"><strong>Challenges:</strong> {% if row.submission %}{{ row.submission.challenges_experienced|default:"—" }}{% else %}—{% endif %}</div>
+              <div class="col-12"><strong>Support needed:</strong> {{ row.metrics.support_needed|default:"—" }}</div>
+            </div></td></tr>
+          {% empty %}<tr><td colspan="4" class="text-body-secondary">No monthly records are available for this period.</td></tr>{% endfor %}
         </tbody></table></div>
       </div></div>
     </section>
@@ -113,7 +167,7 @@
         <h2 class="h5">Business milestones</h2>
         <ul class="list-group list-group-flush">
           {% for milestone in milestones %}
-            <li class="list-group-item px-0"><div class="d-flex justify-content-between gap-2"><strong>{{ milestone.title|default:milestone.get_milestone_type_display }}</strong><span class="small text-body-secondary">{{ milestone.milestone_date|date:"j M Y" }}</span></div><div>{{ milestone.description|default:"No description provided." }}</div><small class="text-body-secondary">Review: {{ milestone.review_status|title }}</small></li>
+            <li class="list-group-item px-0"><div class="d-flex justify-content-between gap-2"><strong>{{ milestone.title|default:milestone.get_milestone_type_display }}</strong><span class="small text-body-secondary">{{ milestone.milestone_date|date:"j M Y" }}</span></div><div>{{ milestone.description|default:"—" }}</div><small class="text-body-secondary">Review: {{ milestone.review_status|title }}</small>{% if milestone.evidence %}<div><a href="{% url 'incubation:progress_evidence_download' business.pk 'milestone' milestone.pk %}">Evidence: {{ milestone.original_filename|default:"Download file" }}</a></div>{% endif %}</li>
           {% empty %}<li class="list-group-item px-0 text-body-secondary">No milestones recorded.</li>{% endfor %}
         </ul>
       </div></div>
@@ -122,44 +176,70 @@
       <div class="card"><div class="card-body">
         <h2 class="h5">Reported challenges</h2>
         <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date reported</th><th>Category</th><th>Description</th><th>Status</th><th>Review</th></tr></thead><tbody>
-          {% for challenge in challenges %}<tr><td>{{ challenge.reported_at|date:"j M Y" }}</td><td>{{ challenge.get_category_display }}</td><td>{{ challenge.description|truncatewords:30 }}</td><td>{{ challenge.get_status_display }}</td><td>{{ challenge.review_status|title }}</td></tr>
+          {% for challenge in challenges %}<tr><td>{{ challenge.reported_at|date:"j M Y" }}</td><td>{{ challenge.get_category_display }}</td><td>{{ challenge.description|truncatewords:30 }}{% if challenge.evidence %}<br><a href="{% url 'incubation:progress_evidence_download' business.pk 'challenge' challenge.pk %}">Evidence: {{ challenge.evidence_original_filename|default:"Download file" }}</a>{% endif %}</td><td>{{ challenge.get_status_display }}</td><td>{{ challenge.review_status|title }}</td></tr>
           {% empty %}<tr><td colspan="5" class="text-body-secondary">No challenges reported.</td></tr>{% endfor %}
         </tbody></table></div>
       </div></div>
     </section>
   </div>
-</main>
+  <section class="card mt-4">
+    <div class="card-body">
+      <h2 class="h5">Support requested and CFERI support history</h2>
+      <div class="row g-4">
+        <div class="col-xl-6"><h3 class="h6">Support requests</h3>
+          {% for support in support_requests %}
+            <article class="border rounded p-3 mb-2"><strong>{{ support.get_category_display }}</strong> · {{ support.submitted_at|date:"j M Y" }} · {{ support.get_status_display }}<p class="mb-1">{{ support.description }}</p>{% if support.evidence %}<a class="small" href="{% url 'incubation:support_request_evidence_download' business.pk support.pk %}">Evidence: {{ support.evidence_original_filename|default:"Download file" }}</a>{% endif %}
+            </article>
+          {% empty %}<p class="text-body-secondary">No support requests recorded.</p>{% endfor %}
+          {% for update in support_request_updates %}{% if update.response %}<article class="border rounded p-3 mb-2"><strong>{{ update.support_request.get_category_display }} response</strong> · {{ update.created_at|date:"j M Y" }}<p class="mb-0">{{ update.response }}</p></article>{% endif %}{% endfor %}
+          {% for need in development_needs %}
+            <article class="border rounded p-3 mb-2"><strong>Need:</strong> {{ need.get_category_display }} · {{ need.identified_at|date:"j M Y" }} · {{ need.get_status_display }}{% if need.description %}<p class="mb-1">{{ need.description }}</p>{% endif %}{% if need.evidence %}<a class="small" href="{% url 'incubation:business_development_need_evidence_download' business.pk need.pk %}">Evidence: {{ need.evidence_original_filename|default:"Download file" }}</a>{% endif %}</article>
+          {% endfor %}
+        </div>
+        <div class="col-xl-6"><h3 class="h6">Assistance provided</h3>
+          {% for update in support_updates %}
+            {% if update.support_provided or update.outcome %}
+              <article class="border rounded p-3 mb-2"><strong>{{ update.need.get_category_display }}</strong> · {{ update.created_at|date:"j M Y" }}
+                {% if update.support_provided %}<p class="mb-1"><strong>Assistance:</strong> {{ update.support_provided|linebreaksbr }}</p>{% endif %}
+                {% if update.outcome %}<p class="mb-1"><strong>Outcome:</strong> {{ update.outcome|linebreaksbr }}</p>{% endif %}
+                {% if update.evidence %}<a class="small" href="{% url 'incubation:business_development_need_update_evidence_download' business.pk update.need_id update.pk %}">Evidence: {{ update.evidence_original_filename|default:"Download file" }}</a>{% endif %}
+                {% if update.mentoring_session %}<p class="small mb-0">Linked mentoring session: {{ update.mentoring_session.session_date|date:"j M Y" }}</p>{% endif %}
+                {% if update.interaction %}<p class="small mb-0">Linked activity: {{ update.interaction.get_interaction_type_display }} · {{ update.interaction.occurred_at|date:"j M Y" }}</p>{% endif %}
+              </article>
+            {% endif %}
+          {% empty %}<p class="text-body-secondary">No assistance updates recorded.</p>{% endfor %}
+        </div>
+        <div class="col-xl-6"><h3 class="h6">Mentorship delivered</h3>
+          {% for session in mentoring_sessions %}<article class="border rounded p-3 mb-2"><strong>{{ session.session_date|date:"j M Y" }}</strong> · {{ session.mentoring_hours }} hours{% if session.mentor %}<div>{{ session.mentor.name }}</div>{% endif %}{% if session.topics %}<p class="mb-0">{{ session.topics }}</p>{% endif %}</article>
+          {% empty %}<p class="text-body-secondary">No mentoring sessions recorded.</p>{% endfor %}
+        </div>
+        <div class="col-xl-6"><h3 class="h6">Training, workshops and other linked interactions</h3>
+          {% for interaction in support_interactions %}<article class="border rounded p-3 mb-2"><strong>{{ interaction.get_interaction_type_display }}</strong> · {{ interaction.occurred_at|date:"j M Y" }}{% if interaction.topics %}<p class="mb-0">{{ interaction.topics }}</p>{% endif %}{% if not is_incubatee_user and interaction.outcome %}<p class="mb-0"><strong>Outcome:</strong> {{ interaction.outcome }}</p>{% endif %}</article>
+          {% empty %}<p class="text-body-secondary">No accessible linked interactions recorded.</p>{% endfor %}
+        </div>
+      </div>
+      <p class="small text-body-secondary mb-0">Business growth is reported alongside recorded CFERI activities; the report does not attribute growth to those activities.</p>
+    </div>
+  </section>
+</div>
 {% if trend_rows %}
 {{ chart_labels|json_script:"business-chart-labels" }}
 {{ revenue_values|json_script:"business-chart-revenue" }}
 {{ customer_values|json_script:"business-chart-customers" }}
-{{ full_time_values|json_script:"business-chart-full-time" }}
-{{ part_time_values|json_script:"business-chart-part-time" }}
+{{ chart_employment_values|json_script:"business-chart-employment" }}
 {{ funding_values|json_script:"business-chart-funding" }}
 <script>
   const reportChartData = id => JSON.parse(document.getElementById(id).textContent);
-  new Chart(document.getElementById("businessPerformanceChart"), {
+  const reportLabels = reportChartData("business-chart-labels");
+  const makeReportChart = (element, label, values, color, currency=false) => new Chart(document.getElementById(element), {
     type: "line",
-    data: {
-      labels: reportChartData("business-chart-labels"),
-      datasets: [
-        {label: "Revenue (ZAR)", data: reportChartData("business-chart-revenue"), yAxisID: "currency", borderColor: "#0d6efd", spanGaps: true},
-        {label: "Customers", data: reportChartData("business-chart-customers"), yAxisID: "count", borderColor: "#198754", spanGaps: true},
-        {label: "Full-time employees", data: reportChartData("business-chart-full-time"), yAxisID: "count", borderColor: "#fd7e14", spanGaps: true},
-        {label: "Part-time employees", data: reportChartData("business-chart-part-time"), yAxisID: "count", borderColor: "#6f42c1", spanGaps: true},
-        {label: "Funding received (ZAR)", data: reportChartData("business-chart-funding"), yAxisID: "currency", borderColor: "#dc3545", spanGaps: true}
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {mode: "index", intersect: false},
-      scales: {
-        currency: {type: "linear", position: "left", title: {display: true, text: "ZAR"}},
-        count: {type: "linear", position: "right", beginAtZero: true, grid: {drawOnChartArea: false}, title: {display: true, text: "Count"}}
-      }
-    }
+    data: {labels: reportLabels, datasets: [{label, data: values, borderColor: color, backgroundColor: color, spanGaps: true, tension: 0.2}]},
+    options: {responsive: true, scales: {y: {beginAtZero: true, ticks: currency ? {callback: value => "R " + value} : {}}}}
   });
+  makeReportChart("revenueChart", "Revenue (ZAR)", reportChartData("business-chart-revenue"), "#0d6efd", true);
+  makeReportChart("customerChart", "Reported customers", reportChartData("business-chart-customers"), "#198754");
+  makeReportChart("employmentChart", "Full-time + part-time employees", reportChartData("business-chart-employment"), "#fd7e14");
+  makeReportChart("fundingChart", "Funding received (ZAR)", reportChartData("business-chart-funding"), "#dc3545", true);
 </script>
 {% endif %}
 {% endblock %}

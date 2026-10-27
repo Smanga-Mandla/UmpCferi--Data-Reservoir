@@ -1,24 +1,32 @@
 from datetime import timedelta
 from urllib.parse import urlsplit
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from unittest.mock import patch
 
 from accounts.access import accessible_queryset, has_access
 from accounts.models import Role, RoleGrant
 from audit.models import AuditEvent
+from incubation.account_access import assignable_cferi_staff, manageable_account_businesses
+from incubation.account_forms import IncubateeAccountForm
+from incubation.forms import AssignmentForm
 from incubation.models import (
     CheckInAccessLink,
     Incubatee,
     IncubateeAccount,
     IncubateeAccountBusiness,
+    IncubateeBaselineSnapshot,
     IncubateeMetricObservation,
     IncubateeMilestone,
+    IncubateeStatusHistory,
     MentoringSession,
     MonthlyCheckIn,
+    Programme,
 )
 
 User = get_user_model()
@@ -66,6 +74,7 @@ class IncubateeAccountManagementTests(TestCase):
             {
                 "full_name": "Avery Synthetic",
                 "email": email,
+                "registration_mode": "existing_business",
                 "businesses": business_ids or [str(self.business.pk)],
                 "entrepreneur_category": IncubateeAccount.EntrepreneurCategory.STUDENT_ENTREPRENEUR,
                 "account_status": status,
@@ -87,6 +96,40 @@ class IncubateeAccountManagementTests(TestCase):
         incubatee_role = Role.objects.get(code=Role.Code.INCUBATEE)
         self.assertFalse(incubatee_role.grants.exists())
 
+    def test_all_active_non_expired_cferi_staff_are_assignable_until_admin_restricts_access(self):
+        additional_staff = self.create_user(
+            "additional.staff@gmail.com", Role.Code.CFERI_STAFF
+        )
+        expired_staff = self.create_user(
+            "expired.staff@gmail.com", Role.Code.CFERI_STAFF
+        )
+        expired_staff.access_expires_at = timezone.now() - timedelta(minutes=1)
+        expired_staff.save(update_fields=("access_expires_at",))
+        restricted_staff = self.create_user(
+            "restricted.staff@gmail.com", Role.Code.CFERI_STAFF
+        )
+        restricted_staff.is_active = False
+        restricted_staff.save(update_fields=("is_active",))
+        admin_form = IncubateeAccountForm(
+            business_queryset=manageable_account_businesses(self.admin),
+            actor=self.admin,
+        )
+        assignment_form = AssignmentForm(instance=self.business, user=self.admin)
+
+        expected = {self.staff.pk, additional_staff.pk}
+        self.assertEqual(
+            set(assignable_cferi_staff().values_list("pk", flat=True)),
+            expected,
+        )
+        self.assertEqual(
+            set(admin_form.fields["assigned_staff"].queryset.values_list("pk", flat=True)),
+            expected,
+        )
+        self.assertEqual(
+            set(assignment_form.fields["staff_owner"].queryset.values_list("pk", flat=True)),
+            expected,
+        )
+
     def test_staff_can_invite_account_linked_only_to_authorized_existing_business(self):
         response = self.create_account(
             self.staff,
@@ -107,6 +150,10 @@ class IncubateeAccountManagementTests(TestCase):
         self.assertEqual(account.invitation_status, "pending")
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("password-reset/", mail.outbox[0].body)
+        self.assertContains(
+            self.client.get(reverse("incubation:account_list")),
+            "Pending",
+        )
         self.assertNotIn("Synthetic-Account-Test", mail.outbox[0].body)
         self.assertTrue(
             AuditEvent.objects.filter(
@@ -116,7 +163,170 @@ class IncubateeAccountManagementTests(TestCase):
             ).exists()
         )
 
+    def test_staff_can_register_new_business_and_capture_onboarding_baseline(self):
+        programme = Programme.objects.create(name="Synthetic Venture Programme")
+        self.login(self.staff)
+        response = self.client.post(
+            reverse("incubation:account_create"),
+            {
+                "registration_mode": "new_business",
+                "full_name": "Idea Founder",
+                "email": "idea.founder@gmail.com",
+                "entrepreneur_category": IncubateeAccount.EntrepreneurCategory.STUDENT_ENTREPRENEUR,
+                "new_business_name": "Synthetic Idea Venture",
+                "business_description": "A proposed local food-growing business.",
+                "business_registration_status": Incubatee.RegistrationStatus.NOT_REGISTERED,
+                "business_stage": Incubatee.BusinessStage.IDEA,
+                "programme": str(programme.pk),
+                "assigned_staff": str(self.staff.pk),
+                "initial_support_needs": "Business planning and market validation",
+                "account_status": "active",
+            },
+        )
+
+        self.assertRedirects(response, reverse("incubation:account_list"))
+        account = IncubateeAccount.objects.get(user__email="idea.founder@gmail.com")
+        business = account.business_links.get().incubatee
+        self.assertEqual(business.legal_name, "Synthetic Idea Venture")
+        self.assertEqual(business.products_services, "A proposed local food-growing business.")
+        self.assertEqual(
+            business.business_registration_status,
+            Incubatee.RegistrationStatus.NOT_REGISTERED,
+        )
+        self.assertEqual(business.business_stage, Incubatee.BusinessStage.IDEA)
+        self.assertEqual(business.programme, programme)
+        self.assertEqual(business.staff_owner, self.staff)
+        self.assertIn(self.staff, business.assigned_users.all())
+        self.assertEqual(
+            business.top_support_needs,
+            ["Business planning and market validation"],
+        )
+        self.assertIsNone(business.cipc_registration_number)
+        self.assertIsNone(business.date_registered)
+        self.assertIsNone(business.revenue_12_months_zar)
+        self.assertIsNone(business.customer_count)
+        self.assertIsNone(business.full_time_employees)
+        self.assertIsNone(business.part_time_employees)
+        self.assertFalse(business.documents.exists())
+        self.assertFalse(business.business_documents.exists())
+        self.assertEqual(
+            business.baseline_history.get().snapshot["business_stage"],
+            Incubatee.BusinessStage.IDEA,
+        )
+        self.assertEqual(business.baseline_history.get().founder_snapshot, [])
+        self.assertEqual(business.created_by, self.staff)
+        self.assertEqual(
+            IncubateeStatusHistory.objects.get(incubatee=business).new_status,
+            Incubatee.Status.APPLICANT,
+        )
+        self.assertEqual(account.invitation_status, "pending")
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                actor=self.staff,
+                object_id=str(account.pk),
+                resource="incubation.incubatee_account",
+            ).exists()
+        )
+        self.assertTrue(
+            AuditEvent.objects.filter(
+                actor=self.staff,
+                object_id=str(business.pk),
+                resource="incubation.incubatee",
+            ).exists()
+        )
+
+    def test_idea_stage_registration_does_not_require_formal_business_details(self):
+        self.login(self.staff)
+        response = self.client.post(
+            reverse("incubation:account_create"),
+            {
+                "registration_mode": "new_business",
+                "full_name": "Student Founder",
+                "email": "student.founder@gmail.com",
+                "entrepreneur_category": IncubateeAccount.EntrepreneurCategory.STUDENT_ENTREPRENEUR,
+                "new_business_name": "Unregistered Student Idea",
+                "business_description": "An early-stage idea.",
+                "business_registration_status": Incubatee.RegistrationStatus.NOT_REGISTERED,
+                "business_stage": Incubatee.BusinessStage.IDEA,
+                "assigned_staff": str(self.staff.pk),
+                "account_status": "active",
+            },
+        )
+
+        self.assertRedirects(response, reverse("incubation:account_list"))
+        business = IncubateeAccount.objects.get(
+            user__email="student.founder@gmail.com"
+        ).business_links.get().incubatee
+        self.assertFalse(business.cipc_registration_number)
+        self.assertIsNone(business.date_registered)
+        self.assertIsNone(business.monthly_average_revenue_zar)
+        self.assertIsNone(business.customer_count)
+        self.assertIsNone(business.full_time_employees)
+        self.assertIsNone(business.part_time_employees)
+        self.assertFalse(business.documents.exists())
+        self.assertFalse(business.business_documents.exists())
+
+    def test_new_business_registration_rejects_existing_business_name(self):
+        self.login(self.staff)
+        response = self.client.post(
+            reverse("incubation:account_create"),
+            {
+                "registration_mode": "new_business",
+                "full_name": "Duplicate Founder",
+                "email": "duplicate.founder@gmail.com",
+                "entrepreneur_category": IncubateeAccount.EntrepreneurCategory.EXTERNAL_SME,
+                "new_business_name": self.business.legal_name.upper(),
+                "business_description": "A duplicate should be linked instead.",
+                "business_registration_status": Incubatee.RegistrationStatus.REGISTERED,
+                "business_stage": Incubatee.BusinessStage.EARLY_REVENUE,
+                "assigned_staff": str(self.staff.pk),
+                "account_status": "active",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Search for and link the existing business")
+        self.assertFalse(
+            User.objects.filter(email="duplicate.founder@gmail.com").exists()
+        )
+        self.assertEqual(Incubatee.objects.filter(legal_name__icontains="Synthetic").count(), 2)
+        self.assertFalse(mail.outbox)
+
+    def test_new_registration_rolls_back_business_and_account_if_invitation_fails(self):
+        self.login(self.staff)
+        with patch(
+            "incubation.account_views.UserPasswordResetForm.save",
+            side_effect=RuntimeError("Invitation could not be sent."),
+        ):
+            with self.assertRaisesMessage(RuntimeError, "Invitation could not be sent."):
+                self.client.post(
+                    reverse("incubation:account_create"),
+                    {
+                        "registration_mode": "new_business",
+                        "full_name": "Rollback Founder",
+                        "email": "rollback.founder@gmail.com",
+                        "entrepreneur_category": IncubateeAccount.EntrepreneurCategory.STUDENT_ENTREPRENEUR,
+                        "new_business_name": "Rolled Back Venture",
+                        "business_description": "Should be rolled back.",
+                        "business_registration_status": Incubatee.RegistrationStatus.NOT_REGISTERED,
+                        "business_stage": Incubatee.BusinessStage.IDEA,
+                        "assigned_staff": str(self.staff.pk),
+                        "account_status": "active",
+                    },
+                )
+
+        self.assertFalse(User.objects.filter(email="rollback.founder@gmail.com").exists())
+        self.assertFalse(IncubateeAccount.objects.filter(user__email="rollback.founder@gmail.com").exists())
+        self.assertFalse(Incubatee.objects.filter(legal_name="Rolled Back Venture").exists())
+        self.assertFalse(IncubateeBaselineSnapshot.objects.filter(
+            incubatee__legal_name="Rolled Back Venture"
+        ).exists())
+
     def test_staff_can_link_any_non_restricted_existing_business(self):
+        Incubatee.objects.filter(pk=self.other_business.pk).update(
+            created_at=timezone.now() - timedelta(days=400)
+        )
         response = self.create_account(
             self.staff,
             "unassigned.entrepreneur@gmail.com",
@@ -128,6 +338,14 @@ class IncubateeAccountManagementTests(TestCase):
             user__email="unassigned.entrepreneur@gmail.com"
         )
         self.assertEqual(account.business_links.get().incubatee, self.other_business)
+        snapshot = IncubateeBaselineSnapshot.objects.get(
+            incubatee=self.other_business
+        )
+        self.assertEqual(snapshot.source, "staff_existing_business_link")
+        self.assertEqual(
+            snapshot.snapshot["date_joined_cferi"][:10],
+            account.business_links.get().linked_at.date().isoformat(),
+        )
         self.assertEqual(account.created_by, self.staff)
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("password-reset/", mail.outbox[0].body)
@@ -616,6 +834,18 @@ class IncubateeAccountManagementTests(TestCase):
             with self.subTest(route=route):
                 self.login(outsider)
                 self.assertEqual(self.client.get(route).status_code, 403)
+                if route == reverse("incubation:account_create"):
+                    self.assertEqual(
+                        self.client.post(
+                            route,
+                            {
+                                "registration_mode": "new_business",
+                                "full_name": "Unauthorized Founder",
+                                "email": "unauthorized.founder@gmail.com",
+                            },
+                        ).status_code,
+                        403,
+                    )
 
         account_user = self.create_user("incubatee@gmail.com", Role.Code.INCUBATEE)
         self.login(account_user)
@@ -636,6 +866,18 @@ class IncubateeAccountManagementTests(TestCase):
         self.assertEqual(create_form.status_code, 200)
         self.assertContains(create_form, "Synthetic Linked Business")
         self.assertContains(create_form, "Synthetic Unassigned Business")
+
+    def test_existing_business_search_limits_link_choices(self):
+        self.login(self.staff)
+
+        response = self.client.get(
+            reverse("incubation:account_create"),
+            {"business_q": "Unassigned"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Synthetic Unassigned Business")
+        self.assertNotContains(response, "Synthetic Linked Business</option>")
 
     def test_incubatee_dashboard_and_management_are_not_public(self):
         self.assertEqual(
