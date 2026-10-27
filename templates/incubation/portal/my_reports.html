@@ -21,7 +21,11 @@
       <nav class="d-flex flex-wrap gap-2" aria-label="Report actions">
         <a class="btn btn-outline-success" href="{% url 'incubation:incubatee_report_export' business.pk 'xlsx' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export Excel</a>
         <a class="btn btn-outline-danger" href="{% url 'incubation:incubatee_report_export' business.pk 'pdf' %}?period_start={{ period_start|urlencode }}&amp;period_end={{ period_end|urlencode }}">Export PDF</a>
-        <a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_dashboard' %}?business={{ business.pk }}">Back to dashboard</a>
+        {% if is_incubatee_user %}
+          <a class="btn btn-outline-secondary" href="{% url 'incubation:incubatee_dashboard' %}?business={{ business.pk }}">Back to dashboard</a>
+        {% else %}
+          <a class="btn btn-outline-secondary" href="{% url 'incubation:list' %}">Back to incubatees</a>
+        {% endif %}
       </nav>
     </div>
   </header>

@@ -323,7 +323,7 @@ class IncubateeManagementTests(TestCase):
         self.assertTrue(incubatee.assigned_users.filter(pk=staff_owner.pk).exists())
         self.assertQuerySetEqual(incubatee.mentors.all(), [mentor])
 
-    def test_board_aggregate_list_excludes_restricted_records_and_suppresses_small_counts(self):
+    def test_board_can_open_non_restricted_reports_without_business_profile_access(self):
         self.client.logout()
         board = self.create_user("board-list@gmail.com", Role.Code.BOARD_MEMBER)
         self.client.force_login(board)
@@ -333,20 +333,80 @@ class IncubateeManagementTests(TestCase):
                 legal_name=f"Synthetic Restricted {index}",
                 sensitivity=Incubatee.Sensitivity.RESTRICTED,
             )
-        self.create_incubatee(
+        visible_business = self.create_incubatee(
             legal_name="Synthetic Visible Board Record",
             sensitivity=Incubatee.Sensitivity.INTERNAL,
+        )
+        confidential_business = self.create_incubatee(
+            legal_name="Synthetic Confidential Board Report",
+            sensitivity=Incubatee.Sensitivity.CONFIDENTIAL,
         )
 
         response = self.client.get(reverse("incubation:list"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["aggregate_only"])
-        self.assertIsNone(response.context["total_count"])
-        self.assertTrue(
-            all(item["total"] is None for item in response.context["status_counts"])
+        self.assertTrue(response.context["report_only"])
+        self.assertFalse(response.context["search_performed"])
+        self.assertContains(response, "Enter a business name")
+        self.assertNotContains(response, "Synthetic Visible Board Record")
+
+        response = self.client.get(
+            reverse("incubation:list"),
+            {"q": "Synthetic Visible Board"},
         )
-        self.assertContains(response, "Suppressed")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["search_performed"])
+        self.assertContains(response, "Synthetic Visible Board Record")
+        self.assertNotContains(response, "Synthetic Restricted 0")
+        self.assertContains(
+            response,
+            reverse("incubation:incubatee_reports", args=(visible_business.pk,)),
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("incubation:incubatee_reports", args=(visible_business.pk,))
+            ).status_code,
+            200,
+        )
+        confidential_search = self.client.get(
+            reverse("incubation:list"),
+            {"q": "Synthetic Confidential Board Report"},
+        )
+        self.assertContains(confidential_search, "Synthetic Confidential Board Report")
+        self.assertContains(
+            confidential_search,
+            reverse(
+                "incubation:incubatee_reports",
+                args=(confidential_business.pk,),
+            ),
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse(
+                    "incubation:incubatee_reports",
+                    args=(confidential_business.pk,),
+                )
+            ).status_code,
+            200,
+        )
+        restricted_business = Incubatee.objects.get(
+            legal_name="Synthetic Restricted 0"
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse(
+                    "incubation:incubatee_reports",
+                    args=(restricted_business.pk,),
+                )
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("incubation:detail", args=(visible_business.pk,))
+            ).status_code,
+            403,
+        )
 
     def test_cipc_duplicates_score_validation_and_permissions(self):
         existing = self.create_incubatee(cipc_registration_number="SYN-DUP-001")

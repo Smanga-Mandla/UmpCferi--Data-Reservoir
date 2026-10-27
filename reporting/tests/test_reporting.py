@@ -94,6 +94,9 @@ class ReportingAndAuditTests(TestCase):
 
         self.assertEqual(dashboard.status_code, 200)
         self.assertContains(dashboard, "Impact dashboard")
+        self.assertNotContains(dashboard, "No recorded value")
+        self.assertNotContains(dashboard, "No comparable data")
+        self.assertContains(dashboard, "Historical monthly trend")
         self.assertEqual(xlsx.status_code, 200)
         self.assertEqual(
             xlsx["Content-Type"],

@@ -73,6 +73,7 @@ from incubation.models import (
     QuarterlyReview,
 )
 from incubation.metrics import data_completeness, incubatee_metrics
+from incubation.report_access import report_accessible_businesses
 from incubation.security import decrypt_id_number, encrypt_id_number, id_number_fingerprint
 from interactions.models import Interaction
 from stakeholders.models import Stakeholder, StakeholderTypeAssignment
@@ -147,54 +148,58 @@ def _is_sensitive_manager(user):
 
 @login_required
 def incubatee_list(request):
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "")
     if is_aggregate_only(request.user):
-        from reporting.metrics import PRIVACY_CELL_MINIMUM
-
-        visible = Incubatee.objects.exclude(
-            sensitivity=Incubatee.Sensitivity.RESTRICTED
-        )
-        status_counts = [
-            {
-                "status": row["status"],
-                "total": (
-                    row["total"]
-                    if row["total"] >= PRIVACY_CELL_MINIMUM
-                    else None
-                ),
-            }
-            for row in visible.values("status").annotate(total=Count("pk"))
-        ]
-        total = visible.count()
+        report_businesses = report_accessible_businesses(request.user)
+        if query:
+            report_businesses = report_businesses.filter(
+                Q(legal_name__icontains=query)
+                | Q(trading_name__icontains=query)
+            )
+            if status in Incubatee.Status.values:
+                report_businesses = report_businesses.filter(status=status)
         return render(
             request,
             "incubation/incubatee_list.html",
             {
-                "aggregate_only": True,
-                "status_counts": status_counts,
-                "total_count": (
-                    total if total >= PRIVACY_CELL_MINIMUM else None
+                "report_only": True,
+                "incubatees": report_businesses.select_related(
+                    "programme", "cohort"
                 ),
+                "statuses": Incubatee.Status.choices,
+                "selected_status": status,
+                "query": query,
+                "search_performed": bool(query),
             },
         )
-    incubatees = _active_incubatees(request.user).select_related(
+    accessible_businesses = _active_incubatees(request.user).select_related(
         "programme", "cohort", "staff_owner"
     )
-    query = request.GET.get("q", "").strip()
-    status = request.GET.get("status", "")
+    incubatees = accessible_businesses.none()
     if query:
-        incubatees = incubatees.filter(
+        incubatees = accessible_businesses.filter(
             Q(legal_name__icontains=query) | Q(trading_name__icontains=query)
         )
-    if status in Incubatee.Status.values:
-        incubatees = incubatees.filter(status=status)
+        if status in Incubatee.Status.values:
+            incubatees = incubatees.filter(status=status)
+    report_business_ids = set()
+    if query:
+        report_business_ids = set(
+            report_accessible_businesses(
+                request.user, queryset=incubatees
+            ).values_list("pk", flat=True)
+        )
     return render(
         request,
         "incubation/incubatee_list.html",
         {
             "incubatees": incubatees,
+            "report_business_ids": report_business_ids,
             "statuses": Incubatee.Status.choices,
             "selected_status": status,
             "query": query,
+            "search_performed": bool(query),
             "can_create": has_access(request.user, RESOURCE, RoleGrant.Action.CREATE),
             "can_import": has_access(request.user, RESOURCE, RoleGrant.Action.CREATE),
             "can_export": has_access(request.user, RESOURCE, RoleGrant.Action.READ),

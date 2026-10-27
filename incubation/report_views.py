@@ -39,6 +39,7 @@ from incubation.models import (
     MonthlyCheckIn,
 )
 from incubation.portal_views import _business_for_portal
+from incubation.report_access import report_accessible_businesses
 from incubation.report_forms import StaffIncubateeMonitoringFilter
 from interactions.models import Interaction
 
@@ -111,9 +112,20 @@ def _date_joined_cferi(baseline, business):
     )
 
 
+def _business_for_report(user, incubatee_id):
+    if user.roles.filter(code=Role.Code.INCUBATEE).exists():
+        return _business_for_portal(user, incubatee_id)
+    return get_object_or_404(
+        report_accessible_businesses(user).select_related(
+            "programme", "cohort"
+        ),
+        pk=incubatee_id,
+    )
+
+
 @login_required
 def incubatee_reports(request, incubatee_id):
-    business = _business_for_portal(request.user, incubatee_id)
+    business = _business_for_report(request.user, incubatee_id)
     try:
         start_date, end_date, period_start, period_end = _report_dates(request)
     except ValueError as error:
@@ -442,7 +454,7 @@ def incubatee_reports(request, incubatee_id):
 def incubatee_report_export(request, incubatee_id, format_name):
     if format_name not in {"xlsx", "pdf"}:
         raise PermissionDenied
-    business = _business_for_portal(request.user, incubatee_id)
+    business = _business_for_report(request.user, incubatee_id)
     try:
         start_date, end_date, _period_start, _period_end = _report_dates(request)
     except ValueError as error:

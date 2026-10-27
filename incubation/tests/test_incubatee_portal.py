@@ -17,7 +17,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 from django.utils import timezone
 
-from accounts.models import Role
+from accounts.models import Role, TOTPDevice
 from audit.models import AuditEvent
 from incubation.models import (
     BusinessDocument,
@@ -1405,6 +1405,53 @@ class IncubateePortalTests(TestCase):
             2,
         )
         self.assertTrue(MonthlyCheckIn.objects.filter(pk=checkin.pk).exists())
+
+    def test_staff_admin_and_super_admin_can_open_reports_with_role_scope(self):
+        report_url = reverse("incubation:incubatee_reports", args=(self.business.pk,))
+        list_url = reverse("incubation:list")
+
+        self.login(self.staff)
+        staff_list = self.client.get(list_url)
+        self.assertNotContains(staff_list, self.business.legal_name)
+        self.assertContains(staff_list, "Enter a business name")
+        staff_list = self.client.get(list_url, {"q": self.business.legal_name})
+        self.assertContains(staff_list, report_url)
+        self.assertContains(staff_list, self.business.legal_name)
+        self.assertNotContains(staff_list, self.other_business.legal_name)
+        self.assertEqual(self.client.get(report_url).status_code, 200)
+        self.assertEqual(
+            self.client.get(
+                reverse("incubation:incubatee_reports", args=(self.other_business.pk,))
+            ).status_code,
+            404,
+        )
+
+        self.login(self.admin)
+        admin_list = self.client.get(list_url)
+        self.assertNotContains(admin_list, self.business.legal_name)
+        admin_list = self.client.get(list_url, {"q": self.business.legal_name})
+        self.assertContains(admin_list, report_url)
+        self.assertEqual(self.client.get(report_url).status_code, 200)
+
+        super_admin = self.create_user(
+            "portal-super-admin@gmail.com", Role.Code.SUPER_ADMIN
+        )
+        TOTPDevice.objects.create(
+            user=super_admin,
+            secret_encrypted="synthetic-encrypted-test-secret",
+            confirmed=True,
+        )
+        self.login(super_admin)
+        session = self.client.session
+        session["mfa_verified_user"] = super_admin.pk
+        session.save()
+        super_admin_list = self.client.get(list_url)
+        self.assertNotContains(super_admin_list, self.business.legal_name)
+        super_admin_list = self.client.get(
+            list_url, {"q": self.business.legal_name}
+        )
+        self.assertContains(super_admin_list, report_url)
+        self.assertEqual(self.client.get(report_url).status_code, 200)
 
     def test_my_reports_distinguish_missing_metrics_from_recorded_zero(self):
         self.login(self.incubatee_user)

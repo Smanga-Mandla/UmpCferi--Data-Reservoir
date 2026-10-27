@@ -8,19 +8,41 @@
     <div class="row g-3"><div class="col-md-4"><div class="card"><div class="card-body"><div class="small text-body-secondary">Total incubatees</div><div class="display-6">{% if total_count is not None %}{{ total_count }}{% else %}Suppressed{% endif %}</div></div></div></div>
       {% for item in status_counts %}<div class="col-md-4"><div class="card"><div class="card-body"><div class="small text-body-secondary">{{ item.status|title }}</div><div class="h3 mb-0">{% if item.total is not None %}{{ item.total }}{% else %}Suppressed{% endif %}</div></div></div></div>{% endfor %}
     </div>
+  {% elif report_only %}
+    <div>
+      <h1 class="h2">Incubatee Business Performance Reports</h1>
+      <p class="text-body-secondary">Search by business name, then select the business report you want to view.</p>
+    </div>
+    <form method="get" class="card card-body my-3"><div class="row g-2 align-items-end">
+      <div class="col-md-6"><label for="incubatee-search" class="form-label">Business name</label><input id="incubatee-search" class="form-control" type="search" name="q" value="{{ query }}" required></div>
+      <div class="col-md-4"><label for="status-filter" class="form-label">Lifecycle status</label><select id="status-filter" class="form-select" name="status"><option value="">All statuses</option>{% for value,label in statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="col-md-2"><button class="btn btn-outline-primary w-100">Filter</button></div>
+    </div></form>
+    {% if search_performed %}
+      <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Business</th><th>Programme / Cohort</th><th>Report</th></tr></thead><tbody>
+        {% for incubatee in incubatees %}<tr><td class="fw-semibold">{{ incubatee }}</td><td>{{ incubatee.programme|default:"—" }}{% if incubatee.cohort %} / {{ incubatee.cohort.name }}{% endif %}</td><td><a class="btn btn-sm btn-outline-primary" href="{% url 'incubation:incubatee_reports' incubatee.pk %}">Business Performance &amp; Reports</a></td></tr>
+        {% empty %}<tr><td colspan="3" class="text-body-secondary">No reportable businesses match that name.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}
+      <p class="text-body-secondary">Enter a business name to find its report.</p>
+    {% endif %}
   {% else %}
     <div class="d-flex justify-content-between align-items-center gap-2"><div><h1 class="h2">Incubatees</h1><p class="text-body-secondary">Company profiles and onboarding records.</p></div>
       <div class="d-flex gap-2">{% if can_export %}<a class="btn btn-outline-success" href="{% url 'reporting:list_export' 'incubatees' 'xlsx' %}?{{ request.GET.urlencode }}">Excel</a><a class="btn btn-outline-danger" href="{% url 'reporting:list_export' 'incubatees' 'pdf' %}?{{ request.GET.urlencode }}">PDF</a>{% endif %}{% if can_import %}<a class="btn btn-outline-primary" href="{% url 'incubation:import' %}">Import Excel</a>{% endif %}{% if can_create %}<a class="btn btn-primary" href="{% url 'incubation:create' %}">Start onboarding</a>{% endif %}</div>
     </div>
     <form method="get" class="card card-body my-3"><div class="row g-2 align-items-end">
-      <div class="col-md-6"><label for="incubatee-search" class="form-label">Search companies</label><input id="incubatee-search" class="form-control" type="search" name="q" value="{{ query }}"></div>
+      <div class="col-md-6"><label for="incubatee-search" class="form-label">Business name</label><input id="incubatee-search" class="form-control" type="search" name="q" value="{{ query }}" required></div>
       <div class="col-md-4"><label for="status-filter" class="form-label">Lifecycle status</label><select id="status-filter" class="form-select" name="status"><option value="">All statuses</option>{% for value,label in statuses %}<option value="{{ value }}" {% if selected_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
       <div class="col-md-2"><button class="btn btn-outline-primary w-100">Filter</button></div>
     </div></form>
-    <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Business</th><th>Status</th><th>Programme / Cohort</th><th>Staff owner</th><th>Updated</th></tr></thead><tbody>
-      {% for incubatee in incubatees %}<tr><td><a href="{% url 'incubation:detail' incubatee.pk %}" class="fw-semibold">{{ incubatee }}</a>{% if incubatee.sic_code %}<div class="small text-body-secondary">SIC {{ incubatee.sic_code }}</div>{% endif %}</td><td>{{ incubatee.get_status_display }}</td><td>{{ incubatee.programme|default:"—" }}{% if incubatee.cohort %} / {{ incubatee.cohort.name }}{% endif %}</td><td>{{ incubatee.staff_owner.email|default:"—" }}</td><td>{{ incubatee.updated_at|date:"Y-m-d" }}</td></tr>
-      {% empty %}<tr><td colspan="5" class="text-body-secondary">No incubatee records are available to your account.</td></tr>{% endfor %}
-    </tbody></table></div>
+    {% if search_performed %}
+      <div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Business</th><th>Status</th><th>Programme / Cohort</th><th>Staff owner</th><th>Updated</th><th>Performance and report</th></tr></thead><tbody>
+        {% for incubatee in incubatees %}<tr><td><a href="{% url 'incubation:detail' incubatee.pk %}" class="fw-semibold">{{ incubatee }}</a>{% if incubatee.sic_code %}<div class="small text-body-secondary">SIC {{ incubatee.sic_code }}</div>{% endif %}</td><td>{{ incubatee.get_status_display }}</td><td>{{ incubatee.programme|default:"—" }}{% if incubatee.cohort %} / {{ incubatee.cohort.name }}{% endif %}</td><td>{{ incubatee.staff_owner.email|default:"—" }}</td><td>{{ incubatee.updated_at|date:"Y-m-d" }}</td><td>{% if incubatee.pk in report_business_ids %}<a class="btn btn-sm btn-outline-primary" href="{% url 'incubation:incubatee_reports' incubatee.pk %}">Business Performance &amp; Reports</a>{% else %}<span class="text-body-secondary">—</span>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="6" class="text-body-secondary">No incubatee businesses match that name.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}
+      <p class="text-body-secondary">Enter a business name to search the incubatees you can access.</p>
+    {% endif %}
   {% endif %}
 </section>
 {% endblock %}
